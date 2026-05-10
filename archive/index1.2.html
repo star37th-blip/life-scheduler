@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>생활관리</title>
+<style>
+:root {
+  --bg:#0a0a0a; --sf:#111; --sf2:#161616; --bd:#222; --bd2:#2a2a2a;
+  --tx:#e8e8e8; --mu:#555; --dim:#888;
+  --sleep:#4ade80; --work:#60a5fa; --exer:#fb923c;
+  --ac:#e8e8e8;
+  --font:'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  font-family:var(--font);background:var(--bg);color:var(--tx);
+  min-height:100vh;display:flex;flex-direction:column;
+  overflow:hidden;user-select:none;
+  transition:background .6s ease;
+}
+body.running-sleep{ background:#0d1f12; }
+body.running-work { background:#0d1220; }
+body.running-exer { background:#1f130d; }
+body.running-idle { background:#1a1a2e; }
+
+/* ── 상단 통계 ── */
+.topbar{
+  padding:16px 20px 12px;
+  display:flex;gap:12px;
+  border-bottom:1px solid var(--bd);
+  flex-shrink:0;
+}
+.stat-pill{
+  flex:1;background:var(--sf2);border:1px solid var(--bd);
+  padding:10px 14px;
+}
+.stat-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);margin-bottom:4px;}
+.stat-val{font-size:18px;font-weight:700;color:var(--tx);line-height:1;}
+.stat-val span{font-size:10px;font-weight:400;color:var(--dim);}
+.stat-sub{font-size:9px;color:var(--mu);margin-top:3px;}
+
+/* ── 중앙 타이머 영역 ── */
+.center{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:8px;position:relative;
+}
+.timer-ring{
+  width:180px;height:180px;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.timer-ring svg{position:absolute;top:0;left:0;transform:rotate(-90deg);}
+.ring-bg{fill:none;stroke:var(--bd2);stroke-width:2;}
+.ring-fill{fill:none;stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:502;stroke-dashoffset:502;
+  transition:stroke-dashoffset .5s ease, stroke .3s ease;}
+.timer-btn{
+  width:140px;height:140px;border-radius:50%;
+  background:var(--sf2);border:1px solid var(--bd2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;position:relative;z-index:1;
+}
+.timer-btn:active{transform:scale(.96);}
+@keyframes pulse-ring{
+  0%,100%{opacity:.6;} 50%{opacity:1;}
+}
+.ring-fill.active{ animation:pulse-ring 2s ease-in-out infinite; }
+.timer-btn.running{
+  border-color:var(--ac);
+  box-shadow:0 0 30px rgba(232,232,232,.08);
+}
+.timer-icon{font-size:28px;margin-bottom:6px;transition:all .3s;}
+.timer-time{
+  font-size:20px;font-weight:700;font-family:'SF Mono',monospace;
+  letter-spacing:.05em;color:var(--tx);
+}
+.timer-state{font-size:10px;color:var(--mu);margin-top:3px;letter-spacing:.08em;}
+
+.current-activity{
+  font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+  opacity:0;transition:opacity .3s;
+}
+.current-activity.show{opacity:1;}
+
+/* ── 하단 탭 영역 ── */
+.bottom{
+  flex-shrink:0;border-top:1px solid var(--bd);
+  display:flex;flex-direction:column;
+  max-height:40vh;
+}
+.tab-nav{display:flex;border-bottom:1px solid var(--bd);}
+.tab-nav-btn{
+  flex:1;padding:10px 0;font-size:11px;font-weight:600;
+  letter-spacing:.06em;color:var(--mu);
+  background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.tab-nav-btn.active{color:var(--tx);border-bottom-color:var(--tx);}
+.tab-nav-btn.sleep.active{color:var(--sleep);border-bottom-color:var(--sleep);}
+.tab-nav-btn.work.active{color:var(--work);border-bottom-color:var(--work);}
+.tab-nav-btn.exer.active{color:var(--exer);border-bottom-color:var(--exer);}
+
+.tab-panes{flex:1;overflow-y:auto;position:relative;}
+.tab-pane{display:none;padding:0 0 8px 0;}
+.tab-pane.active{display:block;}
+
+.rec-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 16px 4px;
+}
+.rec-title{font-size:10px;color:var(--mu);letter-spacing:.08em;}
+.refresh-btn{
+  background:none;border:1px solid var(--bd);
+  padding:3px 8px;font-size:10px;color:var(--dim);cursor:pointer;transition:all .15s;
+}
+.refresh-btn:active{background:var(--bd);}
+.sync-status{font-size:9px;color:var(--mu);padding:0 16px 4px;}
+.sync-status.err{color:#f87171;}
+
+.rec-item{
+  padding:8px 16px;border-bottom:1px solid var(--bd);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.rec-item:last-child{border-bottom:none;}
+.rec-left{font-size:12px;color:var(--dim);font-family:'SF Mono',monospace;}
+.rec-right{font-size:11px;color:var(--mu);}
+.empty{padding:20px 16px;font-size:12px;color:var(--mu);text-align:center;}
+
+/* ── 오버레이 공통 ── */
+.ov{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);
+  display:flex;align-items:flex-end;justify-content:center;
+  z-index:100;opacity:0;visibility:hidden;transition:all .2s;
+}
+.ov.show{opacity:1;visibility:visible;}
+.modal{
+  width:100%;max-width:480px;background:var(--sf);
+  border-top:1px solid var(--bd2);
+  padding:24px 20px 40px;
+  transform:translateY(20px);transition:transform .2s;
+}
+.ov.show .modal{transform:translateY(0);}
+.modal-title{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);margin-bottom:20px;}
+
+/* ── 종료 모달 ── */
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;}
+.cat-btn{
+  padding:16px 8px;border:1px solid var(--bd2);background:var(--sf2);
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  cursor:pointer;transition:all .15s;
+}
+.cat-btn:active{transform:scale(.97);}
+.cat-btn.selected.sleep{border-color:var(--sleep);background:rgba(74,222,128,.08);}
+.cat-btn.selected.work{border-color:var(--work);background:rgba(96,165,250,.08);}
+.cat-btn.selected.exer{border-color:var(--exer);background:rgba(251,146,60,.08);}
+.cat-icon{font-size:24px;}
+.cat-label{font-size:10px;letter-spacing:.08em;color:var(--dim);}
+.cat-btn.selected .cat-label{color:var(--tx);}
+
+.extra-inputs{display:none;flex-direction:column;gap:10px;margin-bottom:20px;}
+.extra-inputs.show{display:flex;}
+.inp-row{display:flex;gap:8px;}
+.inp-group{flex:1;display:flex;flex-direction:column;gap:4px;}
+.inp-label{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);}
+.inp{
+  background:var(--sf2);border:1px solid var(--bd2);
+  padding:10px 12px;font-size:15px;color:var(--tx);
+  font-family:'SF Mono',monospace;width:100%;
+  outline:none;transition:border-color .15s;
+}
+.inp:focus{border-color:var(--dim);}
+
+.loc-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;display:none;}
+.loc-grid.show{display:flex;}
+.loc-btn{
+  flex:1;padding:10px;border:1px solid var(--bd2);background:var(--sf2);
+  font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--dim);
+  cursor:pointer;transition:all .15s;min-width:60px;text-align:center;
+}
+.loc-btn.selected{border-color:var(--exer);color:var(--exer);}
+
+.save-btn{
+  width:100%;padding:14px;background:var(--tx);color:var(--bg);
+  border:none;font-size:13px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;
+}
+.save-btn:active{opacity:.8;}
+.save-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+/* ── 이어서 하기 모달 ── */
+.resume-modal{align-items:center;}
+.resume-modal .modal{border:1px solid var(--bd2);border-radius:0;padding:28px 24px 32px;}
+.resume-info{margin-bottom:24px;}
+.resume-act{font-size:32px;margin-bottom:8px;}
+.resume-desc{font-size:13px;color:var(--dim);font-family:'SF Mono',monospace;}
+.resume-btns{display:flex;gap:8px;}
+.resume-btn{
+  flex:1;padding:12px;border:1px solid var(--bd2);background:var(--sf2);
+  font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--dim);cursor:pointer;transition:all .15s;
+}
+.resume-btn.primary{background:var(--tx);color:var(--bg);border-color:var(--tx);}
+</style>
+</head>
+<body>
+
+<!-- 상단 통계 -->
+<div class="topbar">
+  <div class="stat-pill">
+    <div class="stat-label">이달 근무</div>
+    <div class="stat-val" id="statWorkH">--<span>h</span></div>
+    <div class="stat-sub" id="statWorkSub">목표 225h</div>
+  </div>
+  <div class="stat-pill">
+    <div class="stat-label">예상 수입</div>
+    <div class="stat-val" id="statIncome">--<span>만</span></div>
+    <div class="stat-sub" id="statIncomeSub">₩15,000/h</div>
+  </div>
+  <div class="stat-pill" style="flex:0 0 auto;min-width:80px;">
+    <div class="stat-label">알림 간격</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+      <input id="notifyInterval" type="number" min="10" max="180"
+        style="width:44px;background:var(--sf);border:1px solid var(--bd2);color:var(--tx);
+               font-size:16px;font-weight:700;padding:0 4px;font-family:var(--font);"
+        value="60" onchange="saveNotifyInterval()">
+      <span style="font-size:10px;color:var(--dim);">분</span>
+    </div>
+  </div>
+</div>
+
+<!-- 중앙 타이머 -->
+<div class="center">
+  <div class="timer-ring" onclick="handleTimerClick()">
+    <svg width="180" height="180" viewBox="0 0 180 180">
+      <circle class="ring-bg" cx="90" cy="90" r="80"/>
+      <circle class="ring-fill" id="ringFill" cx="90" cy="90" r="80"/>
+    </svg>
+    <div class="timer-btn" id="timerBtn">
+      <div class="timer-icon" id="timerIcon">⏱</div>
+      <div class="timer-time" id="timerTime">00:00:00</div>
+      <div class="timer-state" id="timerState">TAP TO START</div>
+    </div>
+  </div>
+  <div class="current-activity" id="currentActivity"></div>
+</div>
+
+<!-- 하단 기록 탭 -->
+<div class="bottom">
+  <div class="tab-nav">
+    <button class="tab-nav-btn sleep active" onclick="switchTab('sleep')">수면</button>
+    <button class="tab-nav-btn work" onclick="switchTab('work')">근무</button>
+    <button class="tab-nav-btn exer" onclick="switchTab('exer')">운동</button>
+  </div>
+  <div class="tab-panes">
+    <div class="tab-pane active" id="pane-sleep">
+      <div class="rec-header">
+        <span class="rec-title" id="title-sleep">이번달 수면</span>
+        <button class="refresh-btn" onclick="loadFromGAS('sleep')">↻</button>
+      </div>
+      <div class="sync-status" id="status-sleep"></div>
+      <div id="list-sleep"><div class="empty">기록 없음</div></div>
+    </div>
+    <div class="tab-pane" id="pane-work">
+      <div class="rec-header">
+        <span class="rec-title" id="title-work">이번달 근무</span>
+        <button class="refresh-btn" onclick="loadFromGAS('work')">↻</button>
+      </div>
+      <div class="sync-status" id="status-work"></div>
+      <div id="list-work"><div class="empty">기록 없음</div></div>
+    </div>
+    <div class="tab-pane" id="pane-exer">
+      <div class="rec-header">
+        <span class="rec-title" id="title-exer">이번달 운동</span>
+        <button class="refresh-btn" onclick="loadFromGAS('exer')">↻</button>
+      </div>
+      <div class="sync-status" id="status-exer"></div>
+      <div id="list-exer"><div class="empty">기록 없음</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 종료 모달 -->
+<div class="ov" id="endOv">
+  <div class="modal">
+    <div class="modal-title">기록 저장</div>
+    <div class="cat-grid">
+      <div class="cat-btn sleep" onclick="selectCat('sleep')">
+        <div class="cat-icon">😴</div>
+        <div class="cat-label">수면</div>
+      </div>
+      <div class="cat-btn work" onclick="selectCat('work')">
+        <div class="cat-icon">💼</div>
+        <div class="cat-label">근무</div>
+      </div>
+      <div class="cat-btn exer" onclick="selectCat('exer')">
+        <div class="cat-icon">💪</div>
+        <div class="cat-label">운동</div>
+      </div>
+    </div>
+    <!-- 근무 추가 입력 -->
+    <div class="extra-inputs" id="workInputs">
+      <div class="inp-row">
+        <div class="inp-group">
+          <div class="inp-label">기본 배달비</div>
+          <input class="inp" type="tel" inputmode="numeric" id="basicPay" placeholder="0">
+        </div>
+        <div class="inp-group">
+          <div class="inp-label">추가 소득</div>
+          <input class="inp" type="tel" inputmode="numeric" id="extraPay" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <!-- 운동 위치 -->
+    <div class="loc-grid" id="locGrid">
+      <div class="loc-btn" onclick="selectLoc('GYM')">GYM</div>
+      <div class="loc-btn" onclick="selectLoc('RUN')">RUN</div>
+      <div class="loc-btn" onclick="selectLoc('WALK')">WALK</div>
+      <div class="loc-btn" onclick="selectLoc('HOME')">HOME</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="save-btn" style="background:var(--sf2);color:var(--dim);border:1px solid var(--bd2);flex:1;" onclick="cancelEnd()">계속 기록</button>
+      <button class="save-btn" style="background:var(--sf2);color:#f87171;border:1px solid #3a1a1a;flex:1;" onclick="discardEnd()">저장 안함</button>
+      <button class="save-btn" id="saveBtn" onclick="saveRecord()" disabled style="flex:1;">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이어서 하기 모달 -->
+<div class="ov resume-modal" id="resumeOv">
+  <div class="modal">
+    <div class="modal-title">진행 중인 기록</div>
+    <div class="resume-info">
+      <div class="resume-act" id="resumeAct"></div>
+      <div class="resume-desc" id="resumeDesc"></div>
+    </div>
+    <div class="resume-btns">
+      <button class="resume-btn" onclick="restartTimer()">새로 시작</button>
+      <button class="resume-btn primary" onclick="continueTimer()">이어서</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyd1KSpAxzkce_4MnQenji5fqarR6nxysjzZS4eZTCA7FClppLGJ96HQgdbkXwQbWVQ/exec';
+const CODE_MAP = { sleep:1, work:2, exer:3 };
+const ICON_MAP = { sleep:'😴', work:'💼', exer:'💪' };
+const NAME_MAP = { sleep:'수면', work:'근무', exer:'운동' };
+const COLOR_MAP = { sleep:'var(--sleep)', work:'var(--work)', exer:'var(--exer)' };
+
+let timerState = JSON.parse(localStorage.getItem('timer_state') || 'null');
+// timerState = { startTime, running }
+let timerInterval = null;
+let selectedCat = null;
+let selectedLoc = '';
+let currentTab = 'sleep';
+
+// ── 유틸 ──
+function p2(n){ return String(n).padStart(2,'0'); }
+function localDateStr(d){
+  return `${String(d.getFullYear()).slice(2)}.${p2(d.getMonth()+1)}.${p2(d.getDate())}`;
+}
+function localTimeStr(d){ return `${p2(d.getHours())}:${p2(d.getMinutes())}`; }
+function durationStr(ms){
+  const h=Math.floor(ms/3600000), m=Math.floor((ms%3600000)/60000);
+  return `${h}:${p2(m)}`;
+}
+function getCurrentMonth(){
+  const d=new Date();
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}`;
+}
+
+let notifyTimer = null;
+
+function saveNotifyInterval(){
+  const val = parseInt(document.getElementById('notifyInterval').value) || 60;
+  localStorage.setItem('notify_interval', val);
+}
+
+function loadNotifyInterval(){
+  const val = localStorage.getItem('notify_interval') || '60';
+  document.getElementById('notifyInterval').value = val;
+  return parseInt(val);
+}
+
+async function requestNotifyPermission(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission === 'granted') return true;
+  if(Notification.permission === 'denied') return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted';
+}
+
+function startWorkNotify(){
+  clearInterval(notifyTimer);
+  const mins = loadNotifyInterval();
+  notifyTimer = setInterval(async ()=>{
+    if(!timerState || !timerState.running) return;
+    const elapsed = new Date() - new Date(timerState.startTime);
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    const granted = await requestNotifyPermission();
+    if(granted){
+      new Notification('💼 근무 중', {
+        body: `${h}시간 ${m}분 경과`,
+        icon: '/favicon.ico',
+        silent: false
+      });
+    }
+  }, mins * 60 * 1000);
+}
+
+function stopWorkNotify(){
+  clearInterval(notifyTimer);
+  notifyTimer = null;
+}
+
+// ── 초기화 ──
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadNotifyInterval();
+  checkResume();
+  loadAllRecords();
+  loadStats();
+});
+
+function checkResume(){
+  if(!timerState || !timerState.running) return;
+  const start = new Date(timerState.startTime);
+  const elapsed = new Date() - start;
+  const h=Math.floor(elapsed/3600000), m=Math.floor((elapsed%3600000)/60000);
+  document.getElementById('resumeAct').textContent = '⏱ 기록 중';
+  document.getElementById('resumeDesc').textContent =
+    `${localTimeStr(start)} 시작 — ${h}시간 ${m}분 경과`;
+  document.getElementById('resumeOv').classList.add('show');
+}
+
+function continueTimer(){
+  document.getElementById('resumeOv').classList.remove('show');
+  startVisual();
+  startInterval();
+  startWorkNotify();
+}
+function restartTimer(){
+  document.getElementById('resumeOv').classList.remove('show');
+  timerState = null;
+  localStorage.removeItem('timer_state');
+  resetVisual();
+}
+
+// ── 타이머 ──
+function handleTimerClick(){
+  if(!timerState || !timerState.running){
+    timerState = { startTime: new Date().toISOString(), running: true };
+    localStorage.setItem('timer_state', JSON.stringify(timerState));
+    startVisual();
+    startInterval();
+    startWorkNotify();
+  } else {
+    clearInterval(timerInterval);
+    openEndModal();
+  }
+}
+
+function startInterval(){
+  clearInterval(timerInterval);
+  timerInterval = setInterval(updateTimerDisplay, 1000);
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay(){
+  if(!timerState) return;
+  const diff = new Date() - new Date(timerState.startTime);
+  const h=Math.floor(diff/3600000), m=Math.floor((diff%3600000)/60000), s=Math.floor((diff%60000)/1000);
+  document.getElementById('timerTime').textContent = `${p2(h)}:${p2(m)}:${p2(s)}`;
+  // 링 애니메이션 (최대 8시간 기준)
+  const pct = Math.min(1, diff / (8*3600000));
+  const offset = 502 - (502 * pct);
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+}
+
+function startVisual(){
+  const btn = document.getElementById('timerBtn');
+  btn.classList.add('running');
+  document.getElementById('timerIcon').textContent = '⏹';
+  document.getElementById('timerState').textContent = 'TAP TO STOP';
+  document.getElementById('ringFill').style.stroke = '#6366f1';
+  document.getElementById('ringFill').classList.add('active');
+  document.body.className = 'running-idle';
+  requestNotifyPermission();
+}
+
+function resetVisual(){
+  const btn = document.getElementById('timerBtn');
+  btn.classList.remove('running');
+  document.getElementById('timerIcon').textContent = '⏱';
+  document.getElementById('timerTime').textContent = '00:00:00';
+  document.getElementById('timerState').textContent = 'TAP TO START';
+  document.getElementById('ringFill').style.strokeDashoffset = 502;
+  document.getElementById('ringFill').style.stroke = '';
+  document.getElementById('ringFill').classList.remove('active');
+  document.getElementById('currentActivity').classList.remove('show');
+  document.body.className = '';
+}
+
+// ── 종료 모달 ──
+function openEndModal(){
+  selectedCat = null; selectedLoc = '';
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('workInputs').classList.remove('show');
+  document.getElementById('locGrid').classList.remove('show');
+  document.getElementById('basicPay').value = '';
+  document.getElementById('extraPay').value = '';
+  document.querySelectorAll('.loc-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('saveBtn').disabled = true;
+  document.getElementById('endOv').classList.add('show');
+}
+
+function selectCat(cat){
+  selectedCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelector(`.cat-btn.${cat}`).classList.add('selected');
+  document.getElementById('workInputs').classList.toggle('show', cat==='work');
+  document.getElementById('locGrid').classList.toggle('show', cat==='exer');
+  document.getElementById('saveBtn').disabled = false;
+  document.body.className = `running-${cat}`;
+  document.getElementById('ringFill').style.stroke = `var(--${cat==='exer'?'exer':cat})`;
+}
+
+function selectLoc(loc){
+  selectedLoc = loc;
+  document.querySelectorAll('.loc-btn').forEach(b=>b.classList.remove('selected'));
+  document.querySelector(`.loc-btn[onclick="selectLoc('${loc}')"]`).classList.add('selected');
+}
+
+function saveRecord(){
+  if(!selectedCat || !timerState) return;
+  const start = new Date(timerState.startTime);
+  const end = new Date();
+  const dur = end - start;
+
+  const basicPay = parseInt(document.getElementById('basicPay').value) || 0;
+  const extraPay = parseInt(document.getElementById('extraPay').value) || 0;
+
+  const record = {
+    date: localDateStr(start),
+    time: localTimeStr(start),
+    code: CODE_MAP[selectedCat],
+    activity: NAME_MAP[selectedCat],
+    startTime: localTimeStr(start),
+    endTime: localTimeStr(end),
+    duration: durationStr(dur),
+    basicPay: selectedCat==='work' ? basicPay : '',
+    extraPay: selectedCat==='work' ? extraPay : '',
+    totalPay: selectedCat==='work' ? basicPay+extraPay : '',
+    exerciseType: selectedCat==='exer' ? selectedLoc : ''
+  };
+
+  // 로컬 저장
+  const key = `rec_${selectedCat}`;
+  const recs = JSON.parse(localStorage.getItem(key)||'[]');
+  recs.unshift(record);
+  if(recs.length>5) recs.splice(5);
+  localStorage.setItem(key, JSON.stringify(recs));
+
+  // GAS 전송
+  sendToGAS(record);
+
+  // 상태 리셋
+  if(selectedCat !== 'work') stopWorkNotify();
+  else stopWorkNotify();
+  timerState = null;
+  localStorage.removeItem('timer_state');
+  resetVisual();
+  document.getElementById('endOv').classList.remove('show');
+
+  // 탭 전환 + 통계 갱신
+  switchTab(selectedCat);
+  setTimeout(()=>{ loadFromGAS(selectedCat); loadStats(); }, 1000);
+}
+
+function cancelEnd(){
+  document.getElementById('endOv').classList.remove('show');
+  startInterval();
+}
+
+function discardEnd(){
+  document.getElementById('endOv').classList.remove('show');
+  stopWorkNotify();
+  timerState = null;
+  localStorage.removeItem('timer_state');
+  clearInterval(timerInterval);
+  resetVisual();
+}
+
+// ── GAS ──
+async function sendToGAS(record){
+  try {
+    const res = await fetch(GAS_URL + '?' + new URLSearchParams(record).toString());
+    await res.json();
+  } catch(e){ console.error('GAS 전송 오류:', e); }
+}
+
+async function loadFromGAS(tabType){
+  const statusEl = document.getElementById('status-'+tabType);
+  const refreshBtn = document.querySelector(`#pane-${tabType} .refresh-btn`);
+  if(refreshBtn){ refreshBtn.textContent='...'; }
+  try {
+    const month = getCurrentMonth();
+    const code = CODE_MAP[tabType];
+    const res = await fetch(`${GAS_URL}?action=loadRecords&month=${month}&code=${code}`);
+    const data = await res.json();
+    if(data.records && data.records.length>0){
+      renderRecords(tabType, data.records);
+      if(statusEl){ statusEl.textContent=`${data.records.length}건`; statusEl.className='sync-status'; }
+      if(tabType==='work') updateStats(data.records);
+    } else {
+      if(statusEl){ statusEl.textContent='데이터 없음'; statusEl.className='sync-status'; }
+    }
+  } catch(e){
+    if(statusEl){ statusEl.textContent='불러오기 실패'; statusEl.className='sync-status err'; }
+  } finally {
+    if(refreshBtn){ refreshBtn.textContent='↻'; }
+  }
+}
+
+function renderRecords(tabType, records){
+  const list = document.getElementById('list-'+tabType);
+  let html = '';
+  records.forEach(r=>{
+    let right = r.duration;
+    if(tabType==='work' && r.totalPay) right = `₩${parseInt(r.totalPay).toLocaleString()}`;
+    if(tabType==='exer' && r.exerciseType) right = r.exerciseType;
+    html += `<div class="rec-item">
+      <span class="rec-left">${r.date} ${r.startTime}–${r.endTime}</span>
+      <span class="rec-right">${right}</span>
+    </div>`;
+  });
+  list.innerHTML = html || '<div class="empty">기록 없음</div>';
+}
+
+function loadAllRecords(){
+  ['sleep','work','exer'].forEach(t => {
+    const recs = JSON.parse(localStorage.getItem(`rec_${t}`)||'[]');
+    if(recs.length>0) renderRecords(t, recs);
+    loadFromGAS(t);
+  });
+}
+
+// ── 통계 ──
+function loadStats(){
+  loadFromGAS('work');
+}
+
+function updateStats(workRecords){
+  let totalMins = 0;
+  workRecords.forEach(r=>{
+    if(!r.duration) return;
+    const parts = r.duration.split(':');
+    totalMins += parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+  });
+  const h = totalMins/60;
+  const income = h * 15000;
+  document.getElementById('statWorkH').innerHTML = `${h.toFixed(1)}<span>h</span>`;
+  document.getElementById('statIncome').innerHTML = `${(income/10000).toFixed(1)}<span>만</span>`;
+  const pct = Math.min(100, h/225*100);
+  document.getElementById('statWorkSub').textContent = `목표 225h · ${pct.toFixed(0)}%`;
+}
+
+// ── 탭 전환 ──
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-nav-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelector(`.tab-nav-btn.${tab}`).classList.add('active');
+  document.getElementById(`pane-${tab}`).classList.add('active');
+}
+</script>
+</body>
+</html>

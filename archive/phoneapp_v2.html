@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>생활관리</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f8f8; min-height:100vh;
+            display:flex; flex-direction:column;
+            transition: background-color 0.3s ease; user-select:none;
+        }
+        body.sleeping  { background:#e8f5e8; }
+        body.working   { background:#e8f4fd; }
+        body.exercising{ background:#fff4e6; }
+
+        .main-area {
+            flex:1; display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            font-size:48px; font-weight:600; color:#666;
+            transition:all 0.3s ease; min-height:50vh; cursor:pointer;
+        }
+        .main-area.sleeping  { color:#2d5a30; }
+        .main-area.working   { color:#2d4a5a; }
+        .main-area.exercising{ color:#b8860b; }
+
+        .timer { font-size:24px; color:#999; margin-top:20px; font-family:'Courier New',monospace; opacity:0; transition:opacity 0.3s ease; }
+        .timer.show { opacity:1; }
+
+        .money-input-area { margin-top:30px; opacity:0; transition:opacity 0.3s ease; }
+        .money-input-area.show { opacity:1; }
+        .money-input-row { display:flex; gap:15px; justify-content:center; }
+        .money-input {
+            background:rgba(255,255,255,0.9); border:2px solid rgba(255,255,255,0.3);
+            border-radius:8px; padding:10px 15px; width:120px;
+            text-align:center; font-size:16px; color:#333;
+        }
+        .money-input:focus { outline:none; border-color:rgba(255,255,255,0.8); }
+
+        .location-buttons { margin-top:30px; display:flex; flex-wrap:wrap; gap:15px; justify-content:center; opacity:0; transition:opacity 0.3s ease; }
+        .location-buttons.show { opacity:1; }
+        .location-btn {
+            background:rgba(255,255,255,0.9); border:2px solid rgba(184,134,11,0.3);
+            border-radius:12px; padding:12px 20px; cursor:pointer;
+            font-size:14px; font-weight:500; color:#b8860b; transition:all 0.2s ease;
+        }
+        .location-btn:hover { background:rgba(184,134,11,0.1); }
+        .location-btn.selected { background:#b8860b; border-color:#b8860b; color:white; }
+
+        /* ── 기록 영역 ── */
+        .records { padding:0 20px 100px 20px; }
+        .records-header {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:10px 0 4px 0;
+        }
+        .records-title { font-size:12px; color:#999; font-weight:600; letter-spacing:0.05em; }
+        .refresh-btn {
+            background:none; border:1px solid #ddd; border-radius:6px;
+            padding:4px 10px; font-size:11px; color:#888; cursor:pointer; transition:all 0.2s;
+        }
+        .refresh-btn:hover { background:#f0f0f0; color:#555; }
+        .refresh-btn.loading { color:#bbb; pointer-events:none; }
+
+        .sync-status { font-size:10px; color:#aaa; padding:2px 0 6px 0; }
+        .sync-status.err { color:#e88; }
+
+        .record-item {
+            padding:8px 10px; font-size:13px; color:#555;
+            font-family:'Courier New',monospace;
+            border-bottom:1px solid #f0f0f0;
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        .record-item:last-child { border-bottom:none; }
+        .record-src { font-size:9px; color:#ccc; margin-left:6px; }
+        .empty-records { color:#999; font-size:14px; padding:20px; text-align:center; }
+
+        /* ── 탭 네비 ── */
+        .tab-navigation {
+            position:fixed; bottom:0; left:0; right:0;
+            background:#f0f0f0; padding:15px 20px 25px 20px;
+            box-shadow:0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .tab-container { display:flex; background:#e0e0e0; border-radius:8px; padding:3px; }
+        .tab-btn {
+            flex:1; display:flex; flex-direction:column; align-items:center;
+            padding:12px 8px; cursor:pointer; transition:all 0.3s ease;
+            background:transparent; border:none; border-radius:6px; margin:0 1px;
+        }
+        .tab-btn.sleep-tab    { color:#4a5d4a; }
+        .tab-btn.work-tab     { color:#4a5d6e; }
+        .tab-btn.exercise-tab { color:#8b7355; }
+        .tab-btn.sleep-tab.active    { background:#90c695; color:white; box-shadow:0 2px 8px rgba(144,198,149,0.4); }
+        .tab-btn.work-tab.active     { background:#4a90e2; color:white; box-shadow:0 2px 8px rgba(74,144,226,0.4); }
+        .tab-btn.exercise-tab.active { background:#daa520; color:white; box-shadow:0 2px 8px rgba(218,165,32,0.4); }
+        .tab-btn:not(.active):hover  { background:rgba(255,255,255,0.5); }
+        .tab-icon  { font-size:20px; margin-bottom:4px; }
+        .tab-label { font-size:11px; font-weight:600; }
+
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+
+        /* ── 모달 ── */
+        .resume-modal {
+            position:fixed; inset:0; background:rgba(0,0,0,0.7);
+            display:flex; align-items:center; justify-content:center;
+            z-index:1000; opacity:0; visibility:hidden; transition:all 0.3s ease;
+        }
+        .resume-modal.show { opacity:1; visibility:visible; }
+        .resume-content {
+            background:white; border-radius:16px; padding:30px;
+            max-width:350px; width:90%; text-align:center;
+            box-shadow:0 20px 40px rgba(0,0,0,0.2);
+            transform:translateY(20px); transition:transform 0.3s ease;
+        }
+        .resume-modal.show .resume-content { transform:translateY(0); }
+        .resume-title    { font-size:18px; font-weight:600; color:#333; margin-bottom:10px; }
+        .resume-activity { font-size:24px; margin:15px 0; }
+        .resume-time     { font-size:14px; color:#666; margin-bottom:25px; font-family:'Courier New',monospace; }
+        .resume-buttons  { display:flex; gap:15px; }
+        .resume-btn { flex:1; padding:12px 20px; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+        .resume-btn.continue { background:#4a90e2; color:white; }
+        .resume-btn.restart  { background:#f0f0f0; color:#666; }
+    </style>
+</head>
+<body>
+
+<div class="resume-modal" id="resumeModal">
+    <div class="resume-content">
+        <div class="resume-title">진행 중인 활동이 있습니다</div>
+        <div class="resume-activity" id="resumeActivity"></div>
+        <div class="resume-time" id="resumeTime"></div>
+        <div class="resume-buttons">
+            <button class="resume-btn continue" onclick="continueActivity()">이어서 하기</button>
+            <button class="resume-btn restart"  onclick="restartActivity()">새로 시작</button>
+        </div>
+    </div>
+</div>
+
+<!-- 수면 -->
+<div class="tab-content active" id="sleepTab">
+    <div class="main-area" id="sleepMainArea" onclick="toggleSleep()">
+        <div>Ready to Sleep</div>
+        <div class="timer" id="sleepTimer">00:00:00</div>
+    </div>
+    <div class="records" id="sleepRecords"></div>
+</div>
+
+<!-- 근무 -->
+<div class="tab-content" id="workTab">
+    <div class="main-area" id="workMainArea" onclick="toggleWork()">
+        <div>Ready to Work</div>
+        <div class="timer" id="workTimer">00:00:00</div>
+        <div class="money-input-area" id="moneyInputArea">
+            <div class="money-input-row">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*"
+                       class="money-input" id="basicPay" placeholder="기본급"
+                       onclick="event.stopPropagation()">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*"
+                       class="money-input" id="extraPay" placeholder="추가금액"
+                       onclick="event.stopPropagation()">
+            </div>
+        </div>
+    </div>
+    <div class="records" id="workRecords"></div>
+</div>
+
+<!-- 운동 -->
+<div class="tab-content" id="exerciseTab">
+    <div class="main-area" id="exerciseMainArea" onclick="toggleExercise()">
+        <div>Ready to Exercise</div>
+        <div class="timer" id="exerciseTimer">00:00:00</div>
+        <div class="location-buttons" id="locationButtons">
+            <button class="location-btn" onclick="selectLocation(event,'GYM')">GYM</button>
+            <button class="location-btn" onclick="selectLocation(event,'RUN')">RUN</button>
+            <button class="location-btn" onclick="selectLocation(event,'WALK')">WALK</button>
+            <button class="location-btn" onclick="selectLocation(event,'HOME')">HOME</button>
+        </div>
+    </div>
+    <div class="records" id="exerciseRecords"></div>
+</div>
+
+<div class="tab-navigation">
+    <div class="tab-container">
+        <button class="tab-btn sleep-tab active" onclick="switchTab('sleep')">
+            <div class="tab-icon">😴</div><div class="tab-label">수면</div>
+        </button>
+        <button class="tab-btn work-tab" onclick="switchTab('work')">
+            <div class="tab-icon">💼</div><div class="tab-label">근무</div>
+        </button>
+        <button class="tab-btn exercise-tab" onclick="switchTab('exercise')">
+            <div class="tab-icon">💪</div><div class="tab-label">운동</div>
+        </button>
+    </div>
+</div>
+
+<script>
+const GAS_URL   = 'https://script.google.com/macros/s/AKfycbyd1KSpAxzkce_4MnQenji5fqarR6nxysjzZS4eZTCA7FClppLGJ96HQgdbkXwQbWVQ/exec';
+const MAX_LOCAL = 5;
+const CODE_MAP  = { sleep:1, work:2, exercise:3 };
+
+let currentTab    = 'sleep';
+let sleepState    = { isSleeping:false,   startTime:null, timer:null };
+let workState     = { isWorking:false,    startTime:null, timer:null };
+let exerciseState = { isExercising:false, startTime:null, timer:null, selectedLocation:'' };
+let pendingResume = null;
+
+// ── 유틸 ──
+function getCurrentMonth() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function p2(n){ return String(n).padStart(2,'0'); }
+
+// ── 초기화 ──
+document.addEventListener('DOMContentLoaded', () => {
+    loadAllStates();
+    displayAllRecords();
+    loadFromGAS('sleep');
+    loadFromGAS('work');
+    loadFromGAS('exercise');
+});
+
+// ══════════════════════════════
+// ── GAS 읽기 ──
+// ══════════════════════════════
+async function loadFromGAS(tabType) {
+    const btn      = document.getElementById(tabType + 'RefreshBtn');
+    const statusEl = document.getElementById(tabType + 'SyncStatus');
+    if (btn) { btn.textContent = '...'; btn.classList.add('loading'); }
+    try {
+        const month = getCurrentMonth();
+        const code  = CODE_MAP[tabType];
+        const res   = await fetch(`${GAS_URL}?action=loadRecords&month=${month}&code=${code}`);
+        const data  = await res.json();
+        if (data.records && data.records.length > 0) {
+            renderGASRecords(tabType, data.records);
+            if (statusEl) { statusEl.textContent = `시트 기준 ${data.records.length}건`; statusEl.className = 'sync-status'; }
+        } else {
+            if (statusEl) { statusEl.textContent = '시트에 데이터 없음'; statusEl.className = 'sync-status'; }
+        }
+    } catch(e) {
+        if (statusEl) { statusEl.textContent = '불러오기 실패'; statusEl.className = 'sync-status err'; }
+    } finally {
+        if (btn) { btn.textContent = '↻ 새로고침'; btn.classList.remove('loading'); }
+    }
+}
+
+function renderGASRecords(tabType, records) {
+    const recordsDiv = document.getElementById(tabType + 'Records');
+    if (!recordsDiv) return;
+    // 헤더/상태 유지, 목록만 교체
+    const header = recordsDiv.querySelector('.records-header');
+    const status = recordsDiv.querySelector('.sync-status');
+    let html = '';
+    records.forEach(r => {
+        if (tabType === 'work') {
+            const pay = r.totalPay ? parseInt(r.totalPay).toLocaleString() : '0';
+            html += `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})</span><span>₩${pay}</span></div>`;
+        } else if (tabType === 'exercise') {
+            const ex = r.exerciseType ? ` [${r.exerciseType}]` : '';
+            html += `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})${ex}</span></div>`;
+        } else {
+            html += `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})</span></div>`;
+        }
+    });
+    recordsDiv.innerHTML = '';
+    if (header) recordsDiv.appendChild(header);
+    if (status) recordsDiv.appendChild(status);
+    const list = document.createElement('div');
+    list.innerHTML = html || '<div class="empty-records">기록이 없습니다</div>';
+    recordsDiv.appendChild(list);
+}
+
+// ── 기록 영역 초기 렌더 ──
+function buildRecordsArea(tabType, localRecords, rowFn) {
+    const div = document.getElementById(tabType + 'Records');
+    if (!div) return;
+    const code = CODE_MAP[tabType];
+    let html = `
+        <div class="records-header">
+            <span class="records-title">${getCurrentMonth()} 기록</span>
+            <button class="refresh-btn" id="${tabType}RefreshBtn" onclick="loadFromGAS('${tabType}')">↻ 새로고침</button>
+        </div>
+        <div class="sync-status" id="${tabType}SyncStatus"></div>
+    `;
+    if (localRecords.length === 0) {
+        html += '<div class="empty-records">기록이 없습니다</div>';
+    } else {
+        localRecords.forEach(r => { html += rowFn(r); });
+    }
+    div.innerHTML = html;
+}
+
+function displayAllRecords() { displaySleepRecords(); displayWorkRecords(); displayExerciseRecords(); }
+
+function displaySleepRecords() {
+    const records = JSON.parse(localStorage.getItem('sleep_records') || '[]');
+    buildRecordsArea('sleep', records, r =>
+        `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})</span><span class="record-src">로컬</span></div>`
+    );
+}
+function displayWorkRecords() {
+    const records = JSON.parse(localStorage.getItem('work_records') || '[]');
+    buildRecordsArea('work', records, r => {
+        const pay = r.totalPay ? r.totalPay.toLocaleString() : '0';
+        return `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})</span><span>₩${pay}<span class="record-src">로컬</span></span></div>`;
+    });
+}
+function displayExerciseRecords() {
+    const records = JSON.parse(localStorage.getItem('exercise_records') || '[]');
+    buildRecordsArea('exercise', records, r => {
+        const ex = r.exerciseType ? ` [${r.exerciseType}]` : '';
+        return `<div class="record-item"><span>${r.date} ${r.startTime}–${r.endTime} (${r.duration})${ex}</span><span class="record-src">로컬</span></div>`;
+    });
+}
+
+// ── GAS 전송 ──
+async function sendToGoogleSheet(record) {
+    try {
+        const res = await fetch(GAS_URL + '?' + new URLSearchParams(record).toString());
+        const result = await res.json();
+        if (!result.success) console.error('GAS 저장 실패:', result.error);
+    } catch(e) { console.error('GAS 전송 오류:', e); }
+}
+
+// ── 상태 로드 ──
+function loadAllStates() {
+    const ss = localStorage.getItem('sleep_state');
+    const ws = localStorage.getItem('work_state');
+    const es = localStorage.getItem('exercise_state');
+    if (ss) sleepState    = JSON.parse(ss);
+    if (ws) workState     = JSON.parse(ws);
+    if (es) exerciseState = JSON.parse(es);
+
+    let active = null;
+    if      (sleepState.isSleeping    && sleepState.startTime)    active = { type:'sleep',    name:'🛌 수면', startTime:sleepState.startTime };
+    else if (workState.isWorking      && workState.startTime)     active = { type:'work',     name:'💼 근무', startTime:workState.startTime };
+    else if (exerciseState.isExercising && exerciseState.startTime) active = { type:'exercise', name:'💪 운동', startTime:exerciseState.startTime };
+    if (active) showResumeModal(active);
+}
+
+function showResumeModal(activity) {
+    pendingResume = activity;
+    const start = new Date(activity.startTime);
+    const elapsed = new Date() - start;
+    const h = Math.floor(elapsed/3600000), m = Math.floor((elapsed%3600000)/60000);
+    document.getElementById('resumeActivity').textContent = activity.name;
+    document.getElementById('resumeTime').textContent = `${start.toTimeString().slice(0,5)} 시작 (${h}시간 ${m}분 경과)`;
+    document.getElementById('resumeModal').classList.add('show');
+}
+function continueActivity() {
+    document.getElementById('resumeModal').classList.remove('show');
+    if (!pendingResume) return;
+    switchTab(pendingResume.type);
+    if      (pendingResume.type === 'sleep')    restoreSleepState();
+    else if (pendingResume.type === 'work')     restoreWorkState();
+    else                                        restoreExerciseState();
+    pendingResume = null;
+}
+function restartActivity() {
+    document.getElementById('resumeModal').classList.remove('show');
+    if (!pendingResume) return;
+    if      (pendingResume.type === 'sleep')    { sleepState    = {isSleeping:false,   startTime:null,timer:null};             saveSleepState(); }
+    else if (pendingResume.type === 'work')     { workState     = {isWorking:false,    startTime:null,timer:null};             saveWorkState(); }
+    else                                        { exerciseState = {isExercising:false, startTime:null,timer:null,selectedLocation:''}; saveExerciseState(); }
+    pendingResume = null;
+}
+
+// ── 상태 복원 ──
+function restoreSleepState() {
+    const el = document.getElementById('sleepMainArea');
+    el.querySelector('div').textContent = 'Sleeping...';
+    el.classList.add('sleeping'); startSleepTimer(); updateBackground();
+}
+function restoreWorkState() {
+    const el = document.getElementById('workMainArea');
+    el.querySelector('div').textContent = 'Working...';
+    el.classList.add('working'); startWorkTimer(); updateBackground();
+}
+function restoreExerciseState() {
+    const el = document.getElementById('exerciseMainArea');
+    el.querySelector('div').textContent = 'Exercising...';
+    el.classList.add('exercising');
+    if (exerciseState.selectedLocation) {
+        document.querySelectorAll('.location-btn').forEach(btn => {
+            if (btn.textContent === exerciseState.selectedLocation) btn.classList.add('selected');
+        });
+    }
+    startExerciseTimer(); updateBackground();
+}
+
+// ── 탭 전환 ──
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabName + 'Tab').classList.add('active');
+    document.querySelector('.tab-btn.' + tabName + '-tab').classList.add('active');
+    currentTab = tabName;
+    updateBackground();
+    loadFromGAS(tabName);
+}
+function updateBackground() {
+    document.body.className = '';
+    if (currentTab==='sleep'    && sleepState.isSleeping)     document.body.classList.add('sleeping');
+    if (currentTab==='work'     && workState.isWorking)       document.body.classList.add('working');
+    if (currentTab==='exercise' && exerciseState.isExercising) document.body.classList.add('exercising');
+}
+
+// ── 토글 ──
+function toggleSleep() {
+    const el = document.getElementById('sleepMainArea');
+    const now = new Date();
+    if (!sleepState.isSleeping) {
+        sleepState.isSleeping = true; sleepState.startTime = now.toISOString();
+        el.querySelector('div').textContent = 'Sleeping...';
+        el.classList.add('sleeping'); startSleepTimer();
+    } else {
+        sleepState.isSleeping = false;
+        saveSleepRecord(sleepState.startTime, now.toISOString());
+        sleepState.startTime = null;
+        el.querySelector('div').textContent = 'Ready to Sleep';
+        el.classList.remove('sleeping'); stopSleepTimer();
+        displaySleepRecords(); setTimeout(() => loadFromGAS('sleep'), 1000);
+    }
+    updateBackground(); saveSleepState();
+}
+function toggleWork() {
+    const el = document.getElementById('workMainArea');
+    const now = new Date();
+    if (!workState.isWorking) {
+        workState.isWorking = true; workState.startTime = now.toISOString();
+        el.querySelector('div').textContent = 'Working...';
+        el.classList.add('working'); startWorkTimer();
+    } else {
+        workState.isWorking = false;
+        saveWorkRecord(workState.startTime, now.toISOString());
+        workState.startTime = null;
+        el.querySelector('div').textContent = 'Ready to Work';
+        el.classList.remove('working'); stopWorkTimer();
+        displayWorkRecords(); setTimeout(() => loadFromGAS('work'), 1000);
+    }
+    updateBackground(); saveWorkState();
+}
+function toggleExercise() {
+    const el = document.getElementById('exerciseMainArea');
+    const now = new Date();
+    if (!exerciseState.isExercising) {
+        exerciseState.isExercising = true; exerciseState.startTime = now.toISOString();
+        el.querySelector('div').textContent = 'Exercising...';
+        el.classList.add('exercising'); startExerciseTimer();
+    } else {
+        exerciseState.isExercising = false;
+        saveExerciseRecord(exerciseState.startTime, now.toISOString());
+        exerciseState.startTime = null;
+        el.querySelector('div').textContent = 'Ready to Exercise';
+        el.classList.remove('exercising'); stopExerciseTimer();
+        displayExerciseRecords(); setTimeout(() => loadFromGAS('exercise'), 1000);
+    }
+    updateBackground(); saveExerciseState();
+}
+
+function selectLocation(event, location) {
+    event.stopPropagation();
+    document.querySelectorAll('.location-btn').forEach(b => b.classList.remove('selected'));
+    event.target.classList.add('selected');
+    exerciseState.selectedLocation = location;
+}
+
+// ── 타이머 ──
+function startSleepTimer() {
+    document.getElementById('sleepTimer').classList.add('show');
+    sleepState.timer = setInterval(() => updateTimer('sleepTimer', sleepState.startTime), 1000);
+}
+function stopSleepTimer() {
+    if (sleepState.timer) { clearInterval(sleepState.timer); sleepState.timer = null; }
+    document.getElementById('sleepTimer').classList.remove('show');
+}
+function startWorkTimer() {
+    document.getElementById('workTimer').classList.add('show');
+    document.getElementById('moneyInputArea').classList.add('show');
+    workState.timer = setInterval(() => updateTimer('workTimer', workState.startTime), 1000);
+}
+function stopWorkTimer() {
+    if (workState.timer) { clearInterval(workState.timer); workState.timer = null; }
+    document.getElementById('workTimer').classList.remove('show');
+    document.getElementById('moneyInputArea').classList.remove('show');
+    document.getElementById('basicPay').value = '';
+    document.getElementById('extraPay').value = '';
+}
+function startExerciseTimer() {
+    document.getElementById('exerciseTimer').classList.add('show');
+    document.getElementById('locationButtons').classList.add('show');
+    exerciseState.timer = setInterval(() => updateTimer('exerciseTimer', exerciseState.startTime), 1000);
+}
+function stopExerciseTimer() {
+    if (exerciseState.timer) { clearInterval(exerciseState.timer); exerciseState.timer = null; }
+    document.getElementById('exerciseTimer').classList.remove('show');
+    document.getElementById('locationButtons').classList.remove('show');
+    document.querySelectorAll('.location-btn').forEach(b => b.classList.remove('selected'));
+    exerciseState.selectedLocation = '';
+}
+function updateTimer(id, startTime) {
+    if (!startTime) return;
+    const diff = new Date() - new Date(startTime);
+    const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+    document.getElementById(id).textContent = `${p2(h)}:${p2(m)}:${p2(s)}`;
+}
+
+// ── 상태 저장 ──
+function saveSleepState()    { localStorage.setItem('sleep_state',    JSON.stringify(sleepState)); }
+function saveWorkState()     { localStorage.setItem('work_state',     JSON.stringify(workState)); }
+function saveExerciseState() { localStorage.setItem('exercise_state', JSON.stringify(exerciseState)); }
+
+// ── 기록 저장 ──
+function saveSleepRecord(startTime, endTime) {
+    const records = JSON.parse(localStorage.getItem('sleep_records') || '[]');
+    const start = new Date(startTime), end = new Date(endTime);
+    const dur = end - start;
+    const record = {
+        date: start.toISOString().split('T')[0].substring(2).replace(/-/g,'.'),
+        time: start.toTimeString().slice(0,5), code:1, activity:'수면',
+        startTime: start.toTimeString().slice(0,5),
+        endTime:   end.toTimeString().slice(0,5),
+        duration: `${Math.floor(dur/3600000)}:${p2(Math.floor((dur%3600000)/60000))}`
+    };
+    records.unshift(record);
+    if (records.length > MAX_LOCAL) records.splice(MAX_LOCAL);
+    localStorage.setItem('sleep_records', JSON.stringify(records));
+    sendToGoogleSheet(record);
+}
+function saveWorkRecord(startTime, endTime) {
+    const records = JSON.parse(localStorage.getItem('work_records') || '[]');
+    const start = new Date(startTime), end = new Date(endTime);
+    const dur = end - start;
+    const basicPay = parseInt(document.getElementById('basicPay').value)  || 0;
+    const extraPay = parseInt(document.getElementById('extraPay').value) || 0;
+    const record = {
+        date: start.toISOString().split('T')[0].substring(2).replace(/-/g,'.'),
+        time: start.toTimeString().slice(0,5), code:2, activity:'근무',
+        startTime: start.toTimeString().slice(0,5),
+        endTime:   end.toTimeString().slice(0,5),
+        duration: `${Math.floor(dur/3600000)}:${p2(Math.floor((dur%3600000)/60000))}`,
+        basicPay, extraPay, totalPay: basicPay + extraPay
+    };
+    records.unshift(record);
+    if (records.length > MAX_LOCAL) records.splice(MAX_LOCAL);
+    localStorage.setItem('work_records', JSON.stringify(records));
+    sendToGoogleSheet(record);
+}
+function saveExerciseRecord(startTime, endTime) {
+    const records = JSON.parse(localStorage.getItem('exercise_records') || '[]');
+    const start = new Date(startTime), end = new Date(endTime);
+    const dur = end - start;
+    const record = {
+        date: start.toISOString().split('T')[0].substring(2).replace(/-/g,'.'),
+        time: start.toTimeString().slice(0,5), code:3, activity:'운동',
+        startTime: start.toTimeString().slice(0,5),
+        endTime:   end.toTimeString().slice(0,5),
+        duration: `${Math.floor(dur/3600000)}:${p2(Math.floor((dur%3600000)/60000))}`,
+        exerciseType: exerciseState.selectedLocation
+    };
+    records.unshift(record);
+    if (records.length > MAX_LOCAL) records.splice(MAX_LOCAL);
+    localStorage.setItem('exercise_records', JSON.stringify(records));
+    sendToGoogleSheet(record);
+}
+</script>
+</body>
+</html>

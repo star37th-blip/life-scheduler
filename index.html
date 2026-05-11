@@ -918,8 +918,8 @@ function showResult(rec){
   const dur=rec.duration;
   const parts=dur.split(':');
   const hours=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
-  const bTotal=(rec.baemin_basic||0)+(rec.baemin_promo||0);
-  const cTotal=(rec.coupang_basic||0)+(rec.coupang_promo||0);
+  const bTotal=(parseInt(rec.baemin_basic)||0)+(parseInt(rec.baemin_promo)||0);
+  const cTotal=(parseInt(rec.coupang_basic)||0)+(parseInt(rec.coupang_promo)||0);
   const total=rec.totalPay||0;
   const count=rec.totalCount||0;
   const perCount=count>0?Math.round(total/count):0;

@@ -983,7 +983,7 @@ function renderWorkList(recs){
         <div class="rec-l">${r.date} ${r.startTime}–${r.endTime} (${r.duration})</div>
         <div style="display:flex;gap:8px;margin-top:2px;">${sub}</div>
       </div>
-      <span class="rec-r" style="color:var(--tx)">${arr.filter(s=>s.date===r.date).reduce((s,s2)=>s+(parseInt(s2.totalPay)||0),0).toLocaleString()}</span>
+      
     </div>`;
   }).join('');
 }

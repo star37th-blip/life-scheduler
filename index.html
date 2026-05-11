@@ -609,12 +609,39 @@ function startNotify(){
 function stopNotify(){clearInterval(notifyTimer);notifyTimer=null;}
 
 // ── INIT ──
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   loadNotifyInterval();
   checkResume();
   updateTopbar();
+  await syncTodaySessionsFromGAS();
   loadWorkSessionsGAS();
 });
+
+async function syncTodaySessionsFromGAS(){
+  try{
+    const res = await fetch(`${GAS_URL}?action=loadWorkSessions&days=1`);
+    const data = await res.json();
+    if(data.records && data.records.length > 0){
+      const today = todayStr();
+      const numFields = ['baemin_basic','baemin_promo','baemin_count',
+                         'coupang_basic','coupang_promo','coupang_count',
+                         'totalPay','totalCount'];
+      const gasToday = data.records
+        .filter(r => r.date === today)
+        .map(r => {
+          const rec = {...r};
+          numFields.forEach(f => rec[f] = parseInt(rec[f])||0);
+          return rec;
+        });
+      if(gasToday.length > 0){
+        todaySessions = gasToday;
+        localStorage.setItem('today_sessions', JSON.stringify(todaySessions));
+      }
+    }
+  } catch(e){
+    console.warn('GAS 동기화 실패, 로컬 사용');
+  }
+}
 
 function checkResume(){
   if(!timerState?.running)return;

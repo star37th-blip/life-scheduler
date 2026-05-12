@@ -619,15 +619,18 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
 async function syncTodaySessionsFromGAS(){
   try{
-    const res = await fetch(`${GAS_URL}?action=loadWorkSessions&days=1`);
+    const res = await fetch(`${GAS_URL}?action=loadWorkSessions&days=2`);
     const data = await res.json();
     if(data.records && data.records.length > 0){
       const today = todayStr();
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate()-1);
+      const yStr = `${String(yesterday.getFullYear()).slice(2)}.${String(yesterday.getMonth()+1).padStart(2,'0')}.${String(yesterday.getDate()).padStart(2,'0')}`;
       const numFields = ['baemin_basic','baemin_promo','baemin_count',
                          'coupang_basic','coupang_promo','coupang_count',
                          'totalPay','totalCount'];
       const gasToday = data.records
-        .filter(r => r.date === today)
+        .filter(r => r.date === today || r.date === yStr)
         .map(r => {
           const rec = {...r};
           numFields.forEach(f => rec[f] = parseInt(rec[f])||0);
@@ -918,8 +921,8 @@ function showResult(rec){
   const dur=rec.duration;
   const parts=dur.split(':');
   const hours=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
-  const bTotal=(parseInt(rec.baemin_basic)||0)+(parseInt(rec.baemin_promo)||0);
-  const cTotal=(parseInt(rec.coupang_basic)||0)+(parseInt(rec.coupang_promo)||0);
+  const bTotal=(rec.baemin_basic||0)+(rec.baemin_promo||0);
+  const cTotal=(rec.coupang_basic||0)+(rec.coupang_promo||0);
   const total=parseInt(rec.totalPay)||0;
   const count=parseInt(rec.totalCount)||0;
   const perCount=count>0?Math.round(total/count):0;
@@ -983,7 +986,6 @@ function renderWorkList(recs){
         <div class="rec-l">${r.date} ${r.startTime}–${r.endTime} (${r.duration})</div>
         <div style="display:flex;gap:8px;margin-top:2px;">${sub}</div>
       </div>
-      
     </div>`;
   }).join('');
 }

@@ -21,50 +21,37 @@ body{
   transition:background .5s ease;
 }
 body.running{background:#0a0d1a;}
-/* ── TOPBAR ── */
-.topbar{
-  padding:14px 18px 10px;
-  display:flex;gap:10px;
-  border-bottom:1px solid var(--bd);
-  flex-shrink:0;
+/* ── 타이머와 누적 실적 ── */
+.session-control,.topbar,.work-day,.bottom,#sheetSyncStatus{width:100%;max-width:540px;align-self:center;}
+.session-control{
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px;border-bottom:1px solid var(--bd);
 }
-.stat-card{
-  flex:1;background:var(--sf2);border:1px solid var(--bd);
-  padding:10px 12px;
-}
-.s-label{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--mu);margin-bottom:3px;}
-.s-val{font-size:17px;font-weight:700;color:var(--tx);font-family:var(--mono);line-height:1;}
-.s-val small{font-size:9px;font-weight:400;color:var(--dim);font-family:var(--font);}
-.s-sub{font-size:8px;color:var(--mu);margin-top:3px;}
-
-/* ── TIMER CENTER ── */
-.center{
-  flex:1;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:10px;
-}
-.ring-wrap{width:190px;height:190px;position:relative;display:flex;align-items:center;justify-content:center;}
-.ring-wrap svg{position:absolute;top:0;left:0;transform:rotate(-90deg);}
-.r-bg{fill:none;stroke:var(--bd2);stroke-width:2.5;}
-.r-fill{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:534;stroke-dashoffset:534;transition:stroke-dashoffset .5s,stroke .3s;}
-.r-fill.pulse{animation:rpulse 2s ease-in-out infinite;}
-@keyframes rpulse{0%,100%{opacity:.6}50%{opacity:1}}
+.timer-caption{display:block;color:#a1a1aa;font-size:12px;margin-bottom:4px;}
+.t-time{font:700 24px/1 var(--mono);font-variant-numeric:tabular-nums;}
 .timer-btn{
-  width:150px;height:150px;border-radius:50%;
-  background:var(--sf2);border:1.5px solid var(--bd2);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;position:relative;z-index:1;
+  min-height:44px;min-width:104px;padding:0 14px;border:1px solid transparent;border-radius:8px;
+  color:#0b1220;background:#93c5fd;font-size:14px;font-weight:750;cursor:pointer;
 }
-.timer-btn:active{transform:scale(.95);}
-.timer-btn.on{border-color:rgba(255,255,255,.3);}
-.t-icon{font-size:26px;margin-bottom:5px;transition:all .2s;}
-.t-time{font-size:19px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;}
-.t-state{font-size:9px;color:var(--mu);margin-top:3px;letter-spacing:.1em;}
+.timer-btn.on{background:#fbc179;color:#271406;}
+.timer-btn:focus-visible,.sbtn:focus-visible{outline:2px solid #e0f2fe;outline-offset:2px;}
+.topbar{padding:12px 16px 8px;flex-shrink:0;}
+.summary-date{font-size:13px;color:#b4bac4;margin-bottom:8px;}
+.stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.stat-card{min-width:0;background:var(--sf2);border:1px solid var(--bd2);border-radius:8px;padding:10px;}
+.s-label,.s-sub{font-size:12px;color:#b4bac4;}
+.s-val{font:700 clamp(17px,5vw,24px)/1.25 var(--mono);margin:3px 0;font-variant-numeric:tabular-nums;}
+.stat-card:nth-child(2) .s-val{color:#a8cdfd;}
+.summary-meta,.round-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;}
+.summary-meta{padding:10px 2px;color:#d4d4d8;}
+.round-stat{border-top:1px solid var(--bd2);padding:10px 2px 2px;color:#b4bac4;}
+.round-stat strong{color:#a8cdfd;font:700 15px var(--mono);white-space:nowrap;}
 /* ── 근무일과 기록 목록 ── */
 .work-day{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--bd);}
 .work-day p{flex:1;font-size:13px;color:var(--tx);}
 #list-work{overflow-y:auto;min-height:0;}
 
-.bottom{flex-shrink:0;border-top:1px solid var(--bd);display:flex;flex-direction:column;max-height:38vh;}
+.bottom{flex:1;min-height:0;border-top:1px solid var(--bd);display:flex;flex-direction:column;}
 .rec-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 16px 3px;}
 .rec-title{font-size:9px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;}
 .rfbtn{background:none;border:1px solid var(--bd);padding:2px 8px;font-size:9px;color:var(--dim);cursor:pointer;}
@@ -165,24 +152,35 @@ body.running{background:#0a0d1a;}
 </head>
 <body>
 
-<!-- TOPBAR -->
-<div class="topbar">
-  <div class="stat-card">
-    <div class="s-label" id="statWorkDayLabel">근무일 수입</div>
-    <div class="s-val" id="statToday">--<small>원</small></div>
-    <div class="s-sub" id="statTodaySub">-- 세션</div>
+<div class="session-control">
+  <div>
+    <span class="timer-caption" id="timerCaption">대기 중</span>
+    <span class="t-time" id="timerTime">00:00:00</span>
   </div>
-  <div class="stat-card">
-    <div class="s-label">일 수입 목표</div>
-    <div class="s-val" id="statGoal">--<small>원</small></div>
-    <div class="s-sub" id="statGoalSub">잔여 --</div>
-  </div>
-  <div class="stat-card">
-    <div class="s-label">이달 근무</div>
-    <div class="s-val" id="statMonth">--<small>h</small></div>
-    <div class="s-sub" id="statMonthSub">목표 225h</div>
-  </div>
+  <button type="button" class="timer-btn" id="timerBtn" onclick="handleTimerClick()">세션 시작</button>
 </div>
+
+<section class="topbar" aria-labelledby="statWorkDayLabel">
+  <h1 class="summary-date" id="statWorkDayLabel">근무일 누적</h1>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="s-label">누적 수입</div>
+      <div class="s-val" id="statToday">—</div>
+      <div class="s-sub" id="statGoalSub"></div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">누적 포인트</div>
+      <div class="s-val" id="statDayPoints">—</div>
+      <div class="s-sub" id="statTodaySub"></div>
+    </div>
+  </div>
+  <div class="summary-meta">
+    <span id="statWorkTime">근무 0분</span><span id="statWorkCount">배달 0건</span>
+  </div>
+  <div class="round-stat">
+    <span id="statRoundLabel">배민 회차 누적</span><strong id="statRoundPoints">—</strong>
+  </div>
+</section>
 
 <div class="work-day">
   <p id="workDayStatus" role="status"></p>
@@ -190,21 +188,6 @@ body.running{background:#0a0d1a;}
 </div>
 
 <div id="sheetSyncStatus" role="status" aria-live="polite" style="padding:6px 16px;font-size:12px;overflow-wrap:anywhere;"></div>
-
-<!-- TIMER -->
-<div class="center">
-  <div class="ring-wrap" onclick="handleTimerClick()">
-    <svg width="190" height="190" viewBox="0 0 190 190">
-      <circle class="r-bg" cx="95" cy="95" r="85"/>
-      <circle class="r-fill" id="ringFill" cx="95" cy="95" r="85"/>
-    </svg>
-    <div class="timer-btn" id="timerBtn">
-      <div class="t-icon" id="timerIcon">⏱</div>
-      <div class="t-time" id="timerTime">00:00:00</div>
-      <div class="t-state" id="timerState">세션 시작</div>
-    </div>
-  </div>
-</div>
 
 <!-- BOTTOM -->
 <div class="bottom">
@@ -400,6 +383,8 @@ const DAILY_GOAL_DEFAULT = 150000; // 목표탭에서 계산 전 기본값
 
 let timerState = JSON.parse(localStorage.getItem('ts2') || 'null');
 let timerInterval = null;
+let pointRound = null;
+let pointRoundRequest = 0;
 let stoppedAt;
 let workDay = JSON.parse(localStorage.getItem('delivery_work_day') || '{}');
 let syncingWork = false;
@@ -462,7 +447,9 @@ function workMinutes(record) {
 
 function workDayTotals(date) {
   const sessions = readWorkRecords().filter(record => record.date === date);
+  const pointRecords = sessions.filter(record => Number.isFinite(record.points));
   return {
+    points:pointRecords.length ? pointRecords.reduce((sum,record) => sum + record.points,0) : null,
     income: sessions.reduce((sum, record) => sum + (Number(record.totalPay) || 0), 0),
     mins: sessions.reduce((sum, record) => sum + workMinutes(record), 0),
     count: sessions.reduce((sum, record) => sum + (Number(record.totalCount) || 0), 0),
@@ -470,25 +457,56 @@ function workDayTotals(date) {
   };
 }
 
-// ── TOPBAR 업데이트 ──
-function updateTopbar(){
-  const date = workDay.openDate || todayStr();
+function updateTopbar() {
+  const date = timerState?.workDate || workDay.openDate || todayStr();
   const t = workDayTotals(date);
-  document.getElementById('statWorkDayLabel').textContent = date.slice(3) + ' 수입';
-  document.getElementById('statToday').innerHTML=`${t.income.toLocaleString()}<small>원</small>`;
-  document.getElementById('statTodaySub').textContent=`${t.sessions}세션 · ${t.count}건`;
+  const goal = getDailyGoal();
+  const remain = Math.max(0,goal-t.income);
+  document.getElementById('statWorkDayLabel').textContent = date.slice(3).replace('.', '/') + ' 근무일';
+  document.getElementById('statToday').textContent = t.income.toLocaleString() + '원';
+  document.getElementById('statDayPoints').textContent = t.points == null ? '—' : formatPoints(t.points);
+  document.getElementById('statTodaySub').textContent = t.sessions + '세션';
+  document.getElementById('statGoalSub').textContent = remain ? '일 목표까지 ' + remain.toLocaleString() + '원' : '일 목표 달성';
+  const hours = Math.floor(t.mins/60);
+  const minutes = t.mins%60;
+  document.getElementById('statWorkTime').textContent = '근무 ' + (hours ? hours + '시간 ' : '') + minutes + '분';
+  document.getElementById('statWorkCount').textContent = '배달 ' + t.count.toLocaleString() + '건';
+  renderPointRound();
+}
 
-  const goal=getDailyGoal();
-  const remain=Math.max(0,goal-t.income);
-  document.getElementById('statGoal').innerHTML=`${goal.toLocaleString()}<small>원</small>`;
-  document.getElementById('statGoalSub').textContent=remain>0?`잔여 ${remain.toLocaleString()}`:'✓ 달성';
+function formatPoints(points) {
+  return points.toLocaleString('ko-KR',{maximumFractionDigits:1}) + 'P';
+}
 
-  const month = todayStr().slice(0,5);
-  const totalMins = readWorkRecords().filter(record => record.date.startsWith(month + '.'))
-    .reduce((sum, record) => sum + workMinutes(record), 0);
-  const h=(totalMins/60).toFixed(1);
-  document.getElementById('statMonth').innerHTML=`${h}<small>h</small>`;
-  document.getElementById('statMonthSub').textContent=`목표 225h · ${Math.min(100,(totalMins/60/225*100)).toFixed(0)}%`;
+function renderPointRound() {
+  const label = document.getElementById('statRoundLabel');
+  const value = document.getElementById('statRoundPoints');
+  if (!pointRound) {
+    label.textContent = '배민 회차 누적';
+    value.textContent = '—';
+    return;
+  }
+  const shortDate = date => date.slice(5).replace('-', '/');
+  label.textContent = '배민 회차 누적 · ' + shortDate(pointRound.roundStart) + '–' + shortDate(pointRound.roundEnd);
+  value.textContent = formatPoints(pointRound.baseline);
+}
+
+async function refreshPointRound() {
+  const request = ++pointRoundRequest;
+  const now = new Date();
+  const date = inputDate(now);
+  try {
+    const info = await workRequest({
+      action:'loadDeliveryPointBaseline',pointDate:date,startDate:date,startTime:fmtTime(now)
+    });
+    if (request !== pointRoundRequest) return;
+    pointRound = Number.isFinite(info.baseline) && info.roundStart && info.roundEnd ? info : null;
+    renderPointRound();
+  } catch {
+    if (request !== pointRoundRequest) return;
+    pointRound = null;
+    renderPointRound();
+  }
 }
 
 function renderWorkDay() {
@@ -611,28 +629,27 @@ function updateTimerDisplay(){
   const diff=new Date()-new Date(timerState.startTime);
   const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
   document.getElementById('timerTime').textContent=`${p2(h)}:${p2(m)}:${p2(s)}`;
-  const pct=Math.min(1,diff/(8*3600000));
-  document.getElementById('ringFill').style.strokeDashoffset=534-(534*pct);
 }
-function startVisual(){
-  document.getElementById('timerBtn').classList.add('on');
-  document.getElementById('timerIcon').textContent='⏹';
-  document.getElementById('timerState').textContent='세션 종료';
-  document.getElementById('ringFill').style.stroke='#6366f1';
-  document.getElementById('ringFill').classList.add('pulse');
-  document.body.className='running';
+
+function startVisual() {
+  const btn = document.getElementById('timerBtn');
+  btn.classList.add('on');
+  btn.textContent = '세션 종료';
+  document.getElementById('timerCaption').textContent = '근무 중';
+  document.body.className = 'running';
   renderWorkDay();
+  updateTopbar();
 }
-function resetVisual(){
-  document.getElementById('timerBtn').classList.remove('on');
-  document.getElementById('timerIcon').textContent='⏱';
-  document.getElementById('timerTime').textContent='00:00:00';
-  document.getElementById('timerState').textContent='세션 시작';
-  document.getElementById('ringFill').style.strokeDashoffset=534;
-  document.getElementById('ringFill').style.stroke='';
-  document.getElementById('ringFill').classList.remove('pulse');
-  document.body.className='';
+
+function resetVisual() {
+  const btn = document.getElementById('timerBtn');
+  btn.classList.remove('on');
+  btn.textContent = '세션 시작';
+  document.getElementById('timerCaption').textContent = '대기 중';
+  document.getElementById('timerTime').textContent = '00:00:00';
+  document.body.className = '';
   renderWorkDay();
+  updateTopbar();
 }
 
 // ── 종료 모달 ──
@@ -872,6 +889,7 @@ async function syncWorkRecords() {
         if (!saveWorkDay({...workDay, pendingCloses})) throw new Error('기기 상태 저장 실패');
       }
       status.textContent = '시트 저장 완료';
+      if (pending.some(record => Number.isFinite(record.pointCumulative))) refreshPointRound();
     } while (syncRequested);
   } catch (err) {
     const count = readWorkRecords().filter(record => record.pending).length + (workDay.pendingCloses || []).length;
@@ -984,6 +1002,7 @@ async function refreshWork() {
   syncWorkRecords();
   if (loadingWork) return;
   loadingWork = true;
+  refreshPointRound();
   const status = document.getElementById('status-work');
   try {
     status.textContent = '시트 불러오는 중…';

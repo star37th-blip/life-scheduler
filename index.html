@@ -114,6 +114,12 @@ body.running{background:#0a0d1a;}
 .entry-grid span,.point-grid span{display:block;font-size:12px;color:#aaa;margin-bottom:4px;}
 #manualResults legend{color:var(--tx);font-weight:600;padding:0 4px;}
 #manualResults fieldset{border:1px solid var(--bd2);padding:8px 10px;margin:0 0 8px;}
+#breakEdits,#activeBreak{border:1px solid var(--bd2);border-radius:8px;padding:10px;margin-bottom:12px;}
+#breakEdits summary,#activeBreak legend{font-size:14px;font-weight:700;}
+#breakEdits summary{cursor:pointer;}
+.break-field{display:block;margin-top:10px;font-size:13px;color:#c4c4cc;}
+.break-field input{margin-top:4px;}
+.break-choice{display:flex;align-items:center;gap:8px;min-height:36px;font-size:14px;}
 .record-tip{font-size:13px;color:#aaa;margin:10px 0;}
 #recordError{color:#f87171;font-size:12px;margin-bottom:8px;}
 .work-record{width:100%;background:none;border:0;text-align:left;}
@@ -239,7 +245,21 @@ body.running{background:#0a0d1a;}
         <input class="time-inp" type="date" id="edit_work_date">
       </div>
     </div>
-    <p class="record-tip" id="breakSummary" hidden></p>
+    <details id="breakEdits" hidden>
+      <summary>휴식 시간 수정</summary>
+      <p class="record-tip">재개를 늦게 눌렀다면 휴식 후 첫 콜 배차 시각으로 바꿀 수 있습니다.</p>
+      <div id="completedBreaks"></div>
+    </details>
+    <fieldset id="activeBreak" hidden>
+      <legend>휴식 중에 종료하고 있어요</legend>
+      <p class="record-tip" id="activeBreakSince"></p>
+      <label class="break-choice"><input type="radio" name="breakEndChoice" id="restUntilEnd" onchange="updateBreakSummary()">종료까지 휴식</label>
+      <label class="break-choice"><input type="radio" name="breakEndChoice" id="workedAfterRest" onchange="updateBreakSummary()">중간에 근무 재개</label>
+      <label class="break-field" id="activeBreakTimeField" hidden>실제 재개 시각
+        <input class="time-inp" id="activeBreakTime" type="datetime-local" onchange="updateBreakSummary()">
+      </label>
+    </fieldset>
+    <p class="record-tip" id="breakSummary" role="status" hidden></p>
     <div id="manualResults">
       <p class="record-tip">이번 세션 실적 · 모르는 항목은 비워 두세요.</p>
       <fieldset>
@@ -633,15 +653,19 @@ function startWorkSession(workDate) {
   startInterval();
 }
 
-function sessionBreakMs(start, end) {
-  const overlap = (from, to) => Math.max(0, Math.min(+end,to) - Math.max(+start,from));
-  const completed = (timerState?.breaks || []).reduce((sum, period) =>
-    sum + overlap(period.start,period.end),0);
-  return completed + (timerState?.pauseStartedAt != null ? overlap(timerState.pauseStartedAt,+end) : 0);
+function recordedBreaks(end) {
+  const completed = timerState?.breaks || [];
+  return timerState?.pauseStartedAt == null ? completed :
+    [...completed,{start:timerState.pauseStartedAt,end:+end}];
 }
 
-function sessionWorkMs(start, end) {
-  return Math.max(0, end-start-sessionBreakMs(start,end));
+function sessionBreakMs(start, end, periods = recordedBreaks(end)) {
+  return periods.reduce((sum,period) =>
+    sum + Math.max(0, Math.min(+end,period.end) - Math.max(+start,period.start)),0);
+}
+
+function sessionWorkMs(start, end, periods) {
+  return Math.max(0, end-start-sessionBreakMs(start,end,periods));
 }
 
 function toggleSessionBreak() {
@@ -718,6 +742,7 @@ function openEndModal() {
     : inputDate(start);
   document.getElementById('recordError').textContent = '';
   resetResultInputs(stoppedAt);
+  resetBreakEdits();
   updateBreakSummary();
   document.getElementById('endOv').classList.add('show');
 }
@@ -846,14 +871,83 @@ function readEditedTime(field, original) {
   return new Date(date && time ? date + 'T' + time : NaN);
 }
 
+function breakInputValue(ms) {
+  const date = new Date(ms);
+  return inputDate(date) + 'T' + fmtTime(date);
+}
+
+function resetBreakEdits() {
+  const completed = timerState.breaks || [];
+  const panel = document.getElementById('breakEdits');
+  panel.hidden = !completed.length;
+  panel.open = false;
+  const list = document.getElementById('completedBreaks');
+  list.replaceChildren();
+  completed.forEach((period,index) => {
+    const label = document.createElement('label');
+    label.className = 'break-field';
+    label.textContent = (index + 1) + '번째 휴식 · ' + breakInputValue(period.start).replace('T',' ') + ' 시작 · 실제 재개 시각';
+    const input = document.createElement('input');
+    input.className = 'time-inp';
+    input.type = 'datetime-local';
+    input.id = 'breakResume-' + index;
+    input.value = breakInputValue(period.end);
+    input.addEventListener('change',updateBreakSummary);
+    label.append(input);
+    list.append(label);
+  });
+  const paused = timerState.pauseStartedAt;
+  document.getElementById('activeBreak').hidden = paused == null;
+  document.getElementById('activeBreakSince').textContent = paused == null ? '' :
+    breakInputValue(paused).replace('T',' ') + ' 휴식 시작';
+  document.getElementById('restUntilEnd').checked = false;
+  document.getElementById('workedAfterRest').checked = false;
+  document.getElementById('activeBreakTime').value = '';
+}
+
+function readBreakEdits(end) {
+  const completed = (timerState.breaks || []).map((period,index) => {
+    const input = document.getElementById('breakResume-' + index).value;
+    if (input === breakInputValue(period.end)) return period;
+    const corrected = input === breakInputValue(period.start) ? period.start : input ? +new Date(input) : NaN;
+    // The recorded break may end earlier, but must not overlap the next period.
+    if (!(corrected >= period.start && corrected <= period.end)) {
+      throw new Error((index + 1) + '번째 재개 시각은 휴식 시작부터 기록된 재개 시각 사이로 입력하세요.');
+    }
+    return {start:period.start,end:corrected};
+  });
+
+  const paused = timerState.pauseStartedAt;
+  if (paused == null || paused >= +end) return completed;
+  if (document.getElementById('restUntilEnd').checked) return [...completed,{start:paused,end:+end}];
+  if (!document.getElementById('workedAfterRest').checked) {
+    throw new Error('종료까지 쉬었는지, 중간에 근무를 재개했는지 선택하세요.');
+  }
+  const input = document.getElementById('activeBreakTime').value;
+  const corrected = input === breakInputValue(paused) ? paused : input ? +new Date(input) : NaN;
+  if (!(corrected >= paused && corrected <= +end)) {
+    throw new Error('실제 재개 시각을 휴식 시작부터 세션 종료 사이로 입력하세요.');
+  }
+  return [...completed,{start:paused,end:corrected}];
+}
+
 function updateBreakSummary() {
   const el = document.getElementById('breakSummary');
   if (!timerState || !stoppedAt) return;
+  document.getElementById('activeBreakTimeField').hidden = !document.getElementById('workedAfterRest').checked;
   const start = readEditedTime('start',new Date(timerState.startTime));
   const end = readEditedTime('end',stoppedAt);
-  const rest = end > start ? sessionBreakMs(start,end) : 0;
-  el.hidden = rest <= 0;
-  if (rest > 0) el.textContent = '휴식 ' + fmtDuration(rest) + ' 제외 · 저장 근무시간 ' + fmtDuration(sessionWorkMs(start,end));
+  el.hidden = true;
+  if (!(end > start)) return;
+  try {
+    const periods = readBreakEdits(end);
+    if (!periods.length) return;
+    const rest = sessionBreakMs(start,end,periods);
+    el.textContent = '휴식 ' + fmtDuration(rest) + ' 제외 · 저장 근무시간 ' + fmtDuration(sessionWorkMs(start,end,periods));
+  } catch (err) {
+    el.textContent = err.message;
+  }
+  el.hidden = false;
 }
 
 function saveRecord() {
@@ -867,8 +961,9 @@ function saveRecord() {
     return;
   }
 
-  let results;
+  let results, periods;
   try {
+    periods = readBreakEdits(end);
     results = readManualResults();
   } catch (err) {
     error.textContent = err.message;
@@ -878,7 +973,7 @@ function saveRecord() {
   const record = {
     date, sessionId:timerState.sessionId || newSessionId(), pending:true,
     startDate:fmtDate(start), endDate:fmtDate(end), startTime:fmtTime(start),
-    endTime:fmtTime(end), duration:fmtDuration(sessionWorkMs(start,end)),
+    endTime:fmtTime(end), duration:fmtDuration(sessionWorkMs(start,end,periods)),
     ...results
   };
 

@@ -117,7 +117,6 @@ body.running{background:#0a0d1a;}
 .entry-grid span,.point-grid span{display:block;font-size:12px;color:#aaa;margin-bottom:4px;}
 #manualResults legend{color:var(--tx);font-weight:600;padding:0 4px;}
 #manualResults fieldset{border:1px solid var(--bd2);padding:8px 10px;margin:0 0 8px;}
-#useLastPoints{margin:8px 0;}
 .record-tip{font-size:13px;color:#aaa;margin:10px 0;}
 #recordError{color:#f87171;font-size:12px;margin-bottom:8px;}
 .work-record{width:100%;background:none;border:0;text-align:left;}
@@ -229,8 +228,8 @@ body.running{background:#0a0d1a;}
     <div class="time-edit">
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_start_date">실제 시작</label>
-        <input class="time-inp" type="date" id="edit_start_date">
-        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각">
+        <input class="time-inp" type="date" id="edit_start_date" onchange="loadPointBaseline()">
+        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각" onchange="loadPointBaseline()">
       </div>
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_end_date">실제 종료</label>
@@ -268,11 +267,11 @@ body.running{background:#0a0d1a;}
       <fieldset>
         <legend>배민 누적 포인트</legend>
         <div class="point-grid">
-          <label><span>세션 전 누적(P)</span><input class="time-inp" inputmode="decimal" id="previousCumulative" oninput="previewPoints()"></label>
+          <label><span>세션 전 누적(P)</span><input class="time-inp" inputmode="decimal" id="previousCumulative" oninput="editPointBaseline()"></label>
           <label><span>세션 종료 누적(P)</span><input class="time-inp" inputmode="decimal" id="pointCumulative" oninput="previewPoints()"></label>
-          <label><span>포인트 산정일</span><input class="time-inp" type="date" id="pointDate"></label>
+          <label><span>포인트 산정일</span><input class="time-inp" type="date" id="pointDate" onchange="loadPointBaseline()"></label>
         </div>
-        <button type="button" class="rbtn" id="useLastPoints" hidden>직전 값 사용</button>
+        <p class="record-tip" id="pointBaselineStatus" role="status"></p>
         <p class="record-tip" id="pointPreview" aria-live="polite">같은 회차의 시작 전·종료 누적을 입력하세요.</p>
       </fieldset>
     </div>
@@ -664,26 +663,62 @@ function resetResultInputs(end) {
   }
   document.getElementById('coupangInputs').open = false;
   document.getElementById('pointDate').value = inputDate(end);
-  const latest = readWorkRecords()
-    .filter(record => Number.isFinite(record.pointCumulative))
-    .sort((a,b) => ((b.endDate || b.date)+' '+b.endTime)
-      .localeCompare((a.endDate || a.date)+' '+a.endTime))[0];
-  const button = document.getElementById('useLastPoints');
-  button.hidden = !latest;
-  if (latest) {
-    button.textContent = '같은 회차라면 직전 ' + latest.pointCumulative.toLocaleString() + 'P 사용';
-    button.onclick = () => {
-      document.getElementById('previousCumulative').value = latest.pointCumulative;
-      previewPoints();
-    };
-  }
+  loadPointBaseline();
+}
+
+let pointBaselineRequest = 0;
+let pointBaselineEdited = false;
+
+function editPointBaseline() {
+  pointBaselineEdited = true;
+  document.getElementById('pointBaselineStatus').textContent = '직접 입력한 누적값을 사용합니다.';
   previewPoints();
+}
+
+async function loadPointBaseline() {
+  const request = ++pointBaselineRequest;
+  const el = document.getElementById('previousCumulative');
+  const status = document.getElementById('pointBaselineStatus');
+  el.value = '';
+  pointBaselineEdited = false;
+  previewPoints();
+  status.textContent = '시트에서 세션 전 누적을 확인하는 중…';
+  const query = {
+    action:'loadDeliveryPointBaseline',
+    pointDate:document.getElementById('pointDate').value,
+    startDate:document.getElementById('edit_start_date').value,
+    startTime:document.getElementById('edit_start').value
+  };
+  if (!query.pointDate || !query.startDate || !query.startTime) {
+    status.textContent = '시작 시각과 포인트 산정일을 확인하세요.';
+    return;
+  }
+  if (readWorkRecords().some(record => record.pending && Number.isFinite(record.pointCumulative))) {
+    status.textContent = '시트에 아직 전송되지 않은 포인트 기록이 있습니다. 이전 누적을 직접 확인해 입력하세요.';
+    return;
+  }
+  try {
+    const info = await workRequest(query);
+    if (request !== pointBaselineRequest || pointBaselineEdited) return;
+    if (Number.isFinite(info.baseline)) {
+      el.value = String(info.baseline);
+      status.textContent = '시트에서 가져옴 · ' + info.previousEnd.replace('T',' ') + ' 종료 누적';
+    } else {
+      status.textContent = info.reason === 'roundMissing'
+        ? '시트의 회차 기간을 확인하세요. 이전 누적은 직접 입력할 수 있습니다.'
+        : '이 회차에 저장된 종료 누적이 없습니다. 세션 시작 전 값으로 입력하세요.';
+    }
+    previewPoints();
+  } catch {
+    if (request !== pointBaselineRequest || pointBaselineEdited) return;
+    status.textContent = '시트에서 확인하지 못했습니다. 이전 누적을 직접 입력할 수 있습니다.';
+  }
 }
 
 function readPointInputs() {
   const previous = document.getElementById('previousCumulative').value.trim().replace(/,/g,'');
   const cumulative = document.getElementById('pointCumulative').value.trim().replace(/,/g,'');
-  if (!previous && !cumulative) return {};
+  if (!cumulative) return {};
   const tenths = value => /^\d+(\.\d)?$/.test(value) ? Math.round(Number(value)*10) : NaN;
   const before = tenths(previous);
   const after = tenths(cumulative);

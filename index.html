@@ -110,6 +110,14 @@ body.running{background:#0a0d1a;}
   color-scheme:dark;
 }
 .time-inp[type=date]{font-size:13px;}
+#endOv .result-section{margin-bottom:12px;}
+.entry-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.point-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.entry-grid label,.point-grid label{min-width:0;}
+.entry-grid span,.point-grid span{display:block;font-size:12px;color:#aaa;margin-bottom:4px;}
+#manualResults legend{color:var(--tx);font-weight:600;padding:0 4px;}
+#manualResults fieldset{border:1px solid var(--bd2);padding:8px 10px;margin:0 0 8px;}
+#useLastPoints{margin:8px 0;}
 .record-tip{font-size:13px;color:#aaa;margin:10px 0;}
 #recordError{color:#f87171;font-size:12px;margin-bottom:8px;}
 .work-record{width:100%;background:none;border:0;text-align:left;}
@@ -236,9 +244,39 @@ body.running{background:#0a0d1a;}
         <input class="time-inp" type="date" id="edit_work_date">
       </div>
     </div>
+    <div id="manualResults">
+      <p class="record-tip">이번 세션 실적 · 모르는 항목은 비워 두세요.</p>
+      <fieldset>
+        <legend>배민</legend>
+        <div class="entry-grid">
+          <label><span>기본 수입(원)</span><input class="time-inp" inputmode="numeric" id="baemin_basic"></label>
+          <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="baemin_promo"></label>
+          <label><span>건수</span><input class="time-inp" inputmode="numeric" id="baemin_count"></label>
+        </div>
+      </fieldset>
+      <details id="coupangInputs">
+        <summary>쿠팡 실적 입력</summary>
+        <fieldset>
+          <legend>쿠팡</legend>
+          <div class="entry-grid">
+            <label><span>기본 수입(원)</span><input class="time-inp" inputmode="numeric" id="coupang_basic"></label>
+            <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="coupang_promo"></label>
+            <label><span>건수</span><input class="time-inp" inputmode="numeric" id="coupang_count"></label>
+          </div>
+        </fieldset>
+      </details>
+      <fieldset>
+        <legend>배민 누적 포인트</legend>
+        <div class="point-grid">
+          <label><span>세션 전 누적(P)</span><input class="time-inp" inputmode="decimal" id="previousCumulative" oninput="previewPoints()"></label>
+          <label><span>세션 종료 누적(P)</span><input class="time-inp" inputmode="decimal" id="pointCumulative" oninput="previewPoints()"></label>
+          <label><span>포인트 산정일</span><input class="time-inp" type="date" id="pointDate"></label>
+        </div>
+        <button type="button" class="rbtn" id="useLastPoints" hidden>직전 값 사용</button>
+        <p class="record-tip" id="pointPreview" aria-live="polite">같은 회차의 시작 전·종료 누적을 입력하세요.</p>
+      </fieldset>
+    </div>
     <div id="recordError" role="status"></div>
-
-    <p class="record-tip">실적 캡처 확인 후 이 세션에 수입·건수·포인트를 입력합니다.</p>
     <div class="btn-row">
       <button class="sbtn sec" onclick="cancelEnd()">계속</button>
       <button class="sbtn danger" onclick="discardEnd()">버림</button>
@@ -294,6 +332,10 @@ body.running{background:#0a0d1a;}
       <div class="result-row">
         <span class="result-key">총 수입</span>
         <span class="result-val" id="res-total">--</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">이번 세션 포인트</span>
+        <span class="result-val" id="res-points">--</span>
       </div>
       <div class="result-row">
         <span class="result-key">건당</span>
@@ -612,7 +654,75 @@ function openEndModal() {
     ? '20' + workDate.replace(/\./g, '-')
     : inputDate(start);
   document.getElementById('recordError').textContent = '';
+  resetResultInputs(stoppedAt);
   document.getElementById('endOv').classList.add('show');
+}
+
+function resetResultInputs(end) {
+  for (const field of [...payFields,'previousCumulative','pointCumulative']) {
+    document.getElementById(field).value = '';
+  }
+  document.getElementById('coupangInputs').open = false;
+  document.getElementById('pointDate').value = inputDate(end);
+  const latest = readWorkRecords()
+    .filter(record => Number.isFinite(record.pointCumulative))
+    .sort((a,b) => ((b.endDate || b.date)+' '+b.endTime)
+      .localeCompare((a.endDate || a.date)+' '+a.endTime))[0];
+  const button = document.getElementById('useLastPoints');
+  button.hidden = !latest;
+  if (latest) {
+    button.textContent = '같은 회차라면 직전 ' + latest.pointCumulative.toLocaleString() + 'P 사용';
+    button.onclick = () => {
+      document.getElementById('previousCumulative').value = latest.pointCumulative;
+      previewPoints();
+    };
+  }
+  previewPoints();
+}
+
+function readPointInputs() {
+  const previous = document.getElementById('previousCumulative').value.trim().replace(/,/g,'');
+  const cumulative = document.getElementById('pointCumulative').value.trim().replace(/,/g,'');
+  if (!previous && !cumulative) return {};
+  const tenths = value => /^\d+(\.\d)?$/.test(value) ? Math.round(Number(value)*10) : NaN;
+  const before = tenths(previous);
+  const after = tenths(cumulative);
+  if (!Number.isSafeInteger(before) || !Number.isSafeInteger(after) || after < before) {
+    throw new Error('같은 회차의 이전·종료 누적을 입력하세요. 종료 누적은 이전 누적보다 작을 수 없습니다.');
+  }
+  const pointDate = document.getElementById('pointDate').value;
+  if (!pointDate) throw new Error('포인트 산정일을 선택하세요.');
+  return {previousCumulative:before/10,pointCumulative:after/10,points:(after-before)/10,pointDate};
+}
+
+function previewPoints() {
+  const el = document.getElementById('pointPreview');
+  try {
+    const {points} = readPointInputs();
+    el.textContent = points == null ? '같은 회차의 시작 전·종료 누적을 입력하세요.' :
+      '이번 세션 ' + points.toLocaleString() + 'P';
+  } catch {
+    el.textContent = '이전·종료 누적을 소수 첫째 자리까지 확인하세요.';
+  }
+}
+
+function readManualResults() {
+  const pay = {};
+  for (const field of payFields) {
+    const input = document.getElementById(field).value.trim().replace(/,/g,'');
+    if (!input) continue;
+    if (!/^\d+$/.test(input) || !Number.isSafeInteger(Number(input))) {
+      throw new Error('금액과 건수는 0 이상의 정수로 입력하세요.');
+    }
+    pay[field] = Number(input);
+  }
+  const money = payFields.filter(field => !field.endsWith('_count'));
+  const counts = payFields.filter(field => field.endsWith('_count'));
+  const total = fields => fields.some(field => field in pay)
+    ? fields.reduce((sum,field) => sum + (pay[field] || 0),0) : null;
+  const points = readPointInputs();
+  return {...pay,...points,totalPay:total(money),totalCount:total(counts),
+    awaitingResults:!Object.keys(pay).length && points.points == null};
 }
 
 function workDateFromInput() {
@@ -647,11 +757,19 @@ function saveRecord() {
     return;
   }
 
+  let results;
+  try {
+    results = readManualResults();
+  } catch (err) {
+    error.textContent = err.message;
+    error.scrollIntoView({block:'nearest'});
+    return;
+  }
   const record = {
-    date, sessionId:timerState.sessionId || newSessionId(), pending:true, awaitingResults:true,
+    date, sessionId:timerState.sessionId || newSessionId(), pending:true,
     startDate:fmtDate(start), endDate:fmtDate(end), startTime:fmtTime(start),
     endTime:fmtTime(end), duration:fmtDuration(end - start),
-    totalPay:null, totalCount:null, points:null
+    ...results
   };
 
   try {
@@ -702,7 +820,9 @@ async function syncWorkRecords() {
       if (!pending.length && !closes.length) break;
       status.textContent = '시트 전송 중 · ' + (pending.length + closes.length) + '건';
       for (const {pending: ignored, ...record} of pending) {
-        const result = await workRequest({action:'saveWorkSessionV3', ...record});
+        const hasManualResults = payFields.some(field => record[field] != null) || record.pointCumulative != null;
+        const action = hasManualResults ? 'saveWorkSessionV4' : 'saveWorkSessionV3';
+        const result = await workRequest({action, ...record});
         if (!result.saved || result.sessionId !== record.sessionId) {
           throw new Error('저장 확인 실패');
         }
@@ -742,7 +862,8 @@ function showResult(rec){
   document.getElementById('res-duration').textContent=dur;
   document.getElementById('res-baemin').textContent=bTotal>0?bTotal.toLocaleString()+'원':'-';
   document.getElementById('res-coupang').textContent=cTotal>0?cTotal.toLocaleString()+'원':'-';
-  document.getElementById('res-total').textContent=rec.awaitingResults ? '실적 입력 대기' : total.toLocaleString()+'원';
+  document.getElementById('res-total').textContent=rec.totalPay == null || rec.totalPay === '' ? '실적 입력 대기' : total.toLocaleString()+'원';
+  document.getElementById('res-points').textContent=rec.points == null || rec.points === '' ? '—' : Number(rec.points).toLocaleString()+'P';
   document.getElementById('res-per-count').textContent=perCount>0?perCount.toLocaleString()+'원':'-';
   document.getElementById('res-per-hour').textContent=perHour>0?perHour.toLocaleString()+'원':'-';
 
@@ -808,7 +929,8 @@ function renderWork() {
     amount.className = 'rec-r';
     amount.textContent = record.awaitingResults
       ? '실적 입력 대기'
-      : (Number(record.totalPay) || 0).toLocaleString() + '원';
+      : [record.totalPay != null && record.totalPay !== '' ? Number(record.totalPay).toLocaleString() + '원' : '',
+        record.points != null && record.points !== '' ? Number(record.points).toLocaleString() + 'P' : ''].filter(Boolean).join(' · ');
     item.append(label, amount);
     item.addEventListener('click', () => showResult(record));
     list.append(item);

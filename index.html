@@ -8,7 +8,7 @@
 :root{
   --bg:#0a0a0a;--sf:#111;--sf2:#161616;--bd:#222;--bd2:#2a2a2a;
   --tx:#e8e8e8;--mu:#444;--dim:#777;
-  --work:#60a5fa;--sleep:#4ade80;--exer:#fb923c;
+  --work:#60a5fa;
   --baemin:#facc15;--coupang:#3b82f6;
   --font:'SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:'SF Mono','Fira Code',monospace;
@@ -17,13 +17,10 @@
 html,body{height:100%;overflow:hidden;}
 body{
   font-family:var(--font);background:var(--bg);color:var(--tx);
-  display:flex;flex-direction:column;height:100vh;
+  display:flex;flex-direction:column;height:100vh;height:100dvh;
   transition:background .5s ease;
 }
 body.running{background:#0a0d1a;}
-body.sleep-mode{background:#0d1f12;}
-body.exer-mode{background:#1a0d08;}
-
 /* ── TOPBAR ── */
 .topbar{
   padding:14px 18px 10px;
@@ -39,17 +36,6 @@ body.exer-mode{background:#1a0d08;}
 .s-val{font-size:17px;font-weight:700;color:var(--tx);font-family:var(--mono);line-height:1;}
 .s-val small{font-size:9px;font-weight:400;color:var(--dim);font-family:var(--font);}
 .s-sub{font-size:8px;color:var(--mu);margin-top:3px;}
-
-/* 알림 인터벌 */
-.notify-card{
-  flex:0 0 auto;background:var(--sf2);border:1px solid var(--bd);
-  padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:72px;
-}
-.notify-inp{
-  width:44px;background:var(--sf);border:1px solid var(--bd2);
-  color:var(--tx);font-size:15px;font-weight:700;padding:0 4px;
-  font-family:var(--mono);
-}
 
 /* ── TIMER CENTER ── */
 .center{
@@ -73,24 +59,12 @@ body.exer-mode{background:#1a0d08;}
 .t-icon{font-size:26px;margin-bottom:5px;transition:all .2s;}
 .t-time{font-size:19px;font-weight:700;font-family:var(--mono);letter-spacing:.04em;}
 .t-state{font-size:9px;color:var(--mu);margin-top:3px;letter-spacing:.1em;}
-.cur-act{font-size:10px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;opacity:0;transition:opacity .3s;}
-.cur-act.show{opacity:1;}
+/* ── 근무일과 기록 목록 ── */
+.work-day{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--bd);}
+.work-day p{flex:1;font-size:13px;color:var(--tx);}
+#list-work{overflow-y:auto;min-height:0;}
 
-/* ── BOTTOM TABS ── */
 .bottom{flex-shrink:0;border-top:1px solid var(--bd);display:flex;flex-direction:column;max-height:38vh;}
-.tab-nav{display:flex;border-bottom:1px solid var(--bd);}
-.tnb{
-  flex:1;padding:9px 0;font-size:11px;font-weight:600;letter-spacing:.06em;
-  color:var(--mu);background:none;border:none;cursor:pointer;
-  border-bottom:2px solid transparent;transition:all .15s;
-}
-.tnb.active{color:var(--tx);border-bottom-color:var(--tx);}
-.tnb.work.active{color:var(--work);border-bottom-color:var(--work);}
-.tnb.sleep.active{color:var(--sleep);border-bottom-color:var(--sleep);}
-.tnb.exer.active{color:var(--exer);border-bottom-color:var(--exer);}
-.tab-panes{flex:1;overflow-y:auto;}
-.tab-pane{display:none;padding-bottom:8px;}
-.tab-pane.active{display:block;}
 .rec-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 16px 3px;}
 .rec-title{font-size:9px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;}
 .rfbtn{background:none;border:1px solid var(--bd);padding:2px 8px;font-size:9px;color:var(--dim);cursor:pointer;}
@@ -125,66 +99,9 @@ body.exer-mode{background:#1a0d08;}
 .ov.show .modal{transform:translateY(0);}
 .mo-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);margin-bottom:16px;}
 
-/* 활동 선택 */
-.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
-.cat-btn{
-  padding:14px 8px;border:1px solid var(--bd2);background:var(--sf2);
-  display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:all .15s;
-}
-.cat-btn:active{transform:scale(.96);}
-.cat-btn.sel.work{border-color:var(--work);background:rgba(96,165,250,.08);}
-.cat-btn.sel.sleep{border-color:var(--sleep);background:rgba(74,222,128,.08);}
-.cat-btn.sel.exer{border-color:var(--exer);background:rgba(251,146,60,.08);}
-.cat-icon{font-size:22px;}
-.cat-lbl{font-size:9px;letter-spacing:.08em;color:var(--dim);}
-.cat-btn.sel .cat-lbl{color:var(--tx);}
-
-/* 근무 입력 */
-.work-inputs{display:none;flex-direction:column;gap:12px;margin-bottom:16px;}
-.work-inputs.show{display:flex;}
-.platform-section{display:flex;flex-direction:column;gap:6px;}
-.platform-label{
-  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
-  padding:5px 0;border-bottom:1px solid var(--bd);
-  display:flex;align-items:center;gap:6px;
-}
-.plat-dot{width:6px;height:6px;border-radius:50%;}
-.inp-row{display:flex;gap:6px;}
-.inp-group{flex:1;display:flex;flex-direction:column;gap:3px;}
-.inp-label{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);}
-.inp{
-  background:var(--sf2);border:1px solid var(--bd2);
-  padding:9px 10px;font-size:16px;color:var(--tx);
-  font-family:var(--mono);width:100%;outline:none;transition:border-color .15s;
-}
-.inp:focus{border-color:var(--dim);}
-.inp.small{font-size:14px;}
-
-/* 운동 위치 */
-.loc-grid{display:none;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
-.loc-grid.show{display:flex;}
-.loc-btn{
-  flex:1;padding:9px;border:1px solid var(--bd2);background:var(--sf2);
-  font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--dim);
-  cursor:pointer;transition:all .15s;min-width:56px;text-align:center;
-}
-.loc-btn.sel{border-color:var(--exer);color:var(--exer);}
-
-/* 수면질 */
-.sq-section{margin-bottom:14px;display:none;}
-.sq-select{
-  width:100%;background:var(--sf2);border:1px solid var(--bd2);
-  color:var(--tx);font-size:14px;padding:10px 12px;
-  font-family:var(--mono);outline:none;cursor:pointer;
-  color-scheme:dark;appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23777' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
-}
-.sq-hint{font-size:9px;color:var(--mu);margin-top:4px;}
-
 /* 시간 수정 */
 .time-edit{display:flex;gap:8px;margin-bottom:14px;}
-.time-edit-group{flex:1;display:flex;flex-direction:column;gap:4px;}
+.time-edit-group{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
 .time-edit-label{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);}
 .time-inp{
   background:var(--sf2);border:1px solid var(--bd2);
@@ -192,6 +109,10 @@ body.exer-mode{background:#1a0d08;}
   font-family:var(--mono);width:100%;outline:none;transition:border-color .15s;
   color-scheme:dark;
 }
+.time-inp[type=date]{font-size:13px;}
+.record-tip{font-size:13px;color:#aaa;margin:10px 0;}
+#recordError{color:#f87171;font-size:12px;margin-bottom:8px;}
+.work-record{width:100%;background:none;border:0;text-align:left;}
 .time-inp:focus{border-color:var(--dim);}
 
 /* 버튼 행 */
@@ -240,12 +161,12 @@ body.exer-mode{background:#1a0d08;}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="stat-card">
-    <div class="s-label">오늘 수입</div>
+    <div class="s-label" id="statWorkDayLabel">근무일 수입</div>
     <div class="s-val" id="statToday">--<small>원</small></div>
     <div class="s-sub" id="statTodaySub">-- 세션</div>
   </div>
   <div class="stat-card">
-    <div class="s-label">오늘 목표</div>
+    <div class="s-label">일 수입 목표</div>
     <div class="s-val" id="statGoal">--<small>원</small></div>
     <div class="s-sub" id="statGoalSub">잔여 --</div>
   </div>
@@ -254,14 +175,14 @@ body.exer-mode{background:#1a0d08;}
     <div class="s-val" id="statMonth">--<small>h</small></div>
     <div class="s-sub" id="statMonthSub">목표 225h</div>
   </div>
-  <div class="notify-card">
-    <div class="s-label">알림</div>
-    <div style="display:flex;align-items:center;gap:3px;margin-top:2px;">
-      <input id="notifyInterval" type="number" min="10" max="180" class="notify-inp" value="60" onchange="saveNotifyInterval()">
-      <span style="font-size:9px;color:var(--dim);">분</span>
-    </div>
-  </div>
 </div>
+
+<div class="work-day">
+  <p id="workDayStatus" role="status"></p>
+  <button class="sbtn sec" id="closeWorkDayBtn" type="button" onclick="closeWorkDay()" style="flex:none">근무 마감</button>
+</div>
+
+<div id="sheetSyncStatus" role="status" aria-live="polite" style="padding:6px 16px;font-size:12px;overflow-wrap:anywhere;"></div>
 
 <!-- TIMER -->
 <div class="center">
@@ -273,152 +194,80 @@ body.exer-mode{background:#1a0d08;}
     <div class="timer-btn" id="timerBtn">
       <div class="t-icon" id="timerIcon">⏱</div>
       <div class="t-time" id="timerTime">00:00:00</div>
-      <div class="t-state" id="timerState">TAP TO START</div>
+      <div class="t-state" id="timerState">세션 시작</div>
     </div>
   </div>
-  <div class="cur-act" id="curAct"></div>
 </div>
 
 <!-- BOTTOM -->
 <div class="bottom">
-  <div class="tab-nav">
-    <button class="tnb work active" onclick="switchTab('work')">근무</button>
-    <button class="tnb sleep" onclick="switchTab('sleep')">수면</button>
-    <button class="tnb exer" onclick="switchTab('exer')">운동</button>
-  </div>
-  <div class="tab-panes">
-    <div class="tab-pane active" id="pane-work">
       <div class="rec-hdr">
         <span class="rec-title">근무 세션</span>
         <div style="display:flex;gap:4px;align-items:center;">
           <button class="period-btn active" id="period-7" onclick="setPeriod(7)">7일</button>
           <button class="period-btn" id="period-10" onclick="setPeriod(10)">10일</button>
           <button class="period-btn" id="period-30" onclick="setPeriod(30)">30일</button>
-          <button class="rfbtn" onclick="loadWorkSessionsGAS()">↻</button>
+          <button class="rfbtn" onclick="refreshWork()" aria-label="시트 동기화 다시 시도">↻</button>
         </div>
       </div>
       <div class="sync-st" id="status-work"></div>
       <div id="list-work"><div class="empty">기록 없음</div></div>
-    </div>
-    <div class="tab-pane" id="pane-sleep">
-      <div class="rec-hdr">
-        <span class="rec-title">최근 수면</span>
-        <button class="rfbtn" onclick="loadLifeRecords('sleep')">↻</button>
-      </div>
-      <div class="sync-st" id="status-sleep"></div>
-      <div id="list-sleep"><div class="empty">기록 없음</div></div>
-    </div>
-    <div class="tab-pane" id="pane-exer">
-      <div class="rec-hdr">
-        <span class="rec-title">최근 운동</span>
-        <button class="rfbtn" onclick="loadLifeRecords('exer')">↻</button>
-      </div>
-      <div class="sync-st" id="status-exer"></div>
-      <div id="list-exer"><div class="empty">기록 없음</div></div>
-    </div>
-  </div>
 </div>
 
 <!-- 종료 모달 -->
 <div class="ov" id="endOv">
   <div class="modal">
     <div class="mo-title">기록 저장</div>
-    <div class="cat-grid">
-      <div class="cat-btn work" onclick="selectCat('work')">
-        <div class="cat-icon">💼</div><div class="cat-lbl">근무</div>
-      </div>
-      <div class="cat-btn sleep" onclick="selectCat('sleep')">
-        <div class="cat-icon">😴</div><div class="cat-lbl">수면</div>
-      </div>
-      <div class="cat-btn exer" onclick="selectCat('exer')">
-        <div class="cat-icon">💪</div><div class="cat-lbl">운동</div>
-      </div>
-    </div>
-
-    <!-- 수면질 평가 (수면 선택 시 표시) -->
-    <div class="sq-section" id="sqSection">
-      <div class="inp-label" style="margin-bottom:6px;">수면질</div>
-      <select class="sq-select" id="sleepQuality">
-        <option value="부족">😵 부족 (6시간 미만)</option>
-        <option value="보통">😐 보통 (6~7시간)</option>
-        <option value="적정" selected>😊 적정 (7~9시간)</option>
-        <option value="과수면">😴 과수면 (9시간 초과)</option>
-      </select>
-      <div class="sq-hint" id="sqHint"></div>
-    </div>
-
-    <!-- 시간 수정 -->
     <div class="time-edit">
       <div class="time-edit-group">
-        <div class="time-edit-label">시작</div>
-        <input class="time-inp" type="time" id="edit_start">
+        <label class="time-edit-label" for="edit_start_date">실제 시작</label>
+        <input class="time-inp" type="date" id="edit_start_date">
+        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각">
       </div>
       <div class="time-edit-group">
-        <div class="time-edit-label">종료</div>
-        <input class="time-inp" type="time" id="edit_end">
+        <label class="time-edit-label" for="edit_end_date">실제 종료</label>
+        <input class="time-inp" type="date" id="edit_end_date">
+        <input class="time-inp" type="time" id="edit_end" aria-label="종료 시각">
       </div>
     </div>
-
-    <!-- 근무 입력 -->
-    <div class="work-inputs" id="workInputs">
-      <div id="prevCumHint" style="font-size:9px;color:var(--mu);padding:4px 2px;border-left:2px solid var(--bd2);padding-left:8px;display:none;"></div>
-      <!-- 배민 -->
-      <div class="platform-section">
-        <div class="platform-label">
-          <div class="plat-dot" style="background:var(--baemin)"></div>
-          <span style="font-size:9px;color:var(--mu);">배민</span>
-        </div>
-        <div class="inp-row">
-          <div class="inp-group">
-            <div class="inp-label">기본</div>
-            <input class="inp" type="tel" inputmode="numeric" id="baemin_basic" placeholder="0">
-          </div>
-          <div class="inp-group">
-            <div class="inp-label">프로모션</div>
-            <input class="inp" type="tel" inputmode="numeric" id="baemin_promo" placeholder="0">
-          </div>
-          <div class="inp-group" style="flex:0.5;">
-            <div class="inp-label">건수</div>
-            <input class="inp small" type="tel" inputmode="numeric" id="baemin_count" placeholder="0">
-          </div>
-        </div>
-      </div>
-      <!-- 쿠팡 -->
-      <div class="platform-section">
-        <div class="platform-label">
-          <div class="plat-dot" style="background:var(--coupang)"></div>
-          <span style="font-size:9px;color:var(--mu);">쿠팡</span>
-        </div>
-        <div class="inp-row">
-          <div class="inp-group">
-            <div class="inp-label">기본</div>
-            <input class="inp" type="tel" inputmode="numeric" id="coupang_basic" placeholder="0">
-          </div>
-          <div class="inp-group">
-            <div class="inp-label">프로모션</div>
-            <input class="inp" type="tel" inputmode="numeric" id="coupang_promo" placeholder="0">
-          </div>
-          <div class="inp-group" style="flex:0.5;">
-            <div class="inp-label">건수</div>
-            <input class="inp small" type="tel" inputmode="numeric" id="coupang_count" placeholder="0">
-          </div>
-        </div>
+    <div class="time-edit">
+      <div class="time-edit-group">
+        <label class="time-edit-label" for="edit_work_date">근무일 (실적 합산 기준)</label>
+        <input class="time-inp" type="date" id="edit_work_date">
       </div>
     </div>
+    <div id="recordError" role="status"></div>
 
-    <!-- 운동 위치 -->
-    <div class="loc-grid" id="locGrid">
-      <div class="loc-btn" onclick="selectLoc('GYM')">GYM</div>
-      <div class="loc-btn" onclick="selectLoc('RUN')">RUN</div>
-      <div class="loc-btn" onclick="selectLoc('WALK')">WALK</div>
-      <div class="loc-btn" onclick="selectLoc('HOME')">HOME</div>
-    </div>
-
+    <p class="record-tip">실적 캡처 확인 후 이 세션에 수입·건수·포인트를 입력합니다.</p>
     <div class="btn-row">
       <button class="sbtn sec" onclick="cancelEnd()">계속</button>
       <button class="sbtn danger" onclick="discardEnd()">버림</button>
-      <button class="sbtn primary" id="saveBtn" onclick="saveRecord()" disabled>저장</button>
+      <button class="sbtn primary" id="saveBtn" onclick="saveRecord()">저장</button>
     </div>
+  </div>
+</div>
+
+<div class="ov result-modal" id="closeWorkOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="closeWorkTitle">
+    <div class="mo-title" id="closeWorkTitle">근무 마감</div>
+    <label class="time-edit-label" for="closeKm">누적 계기판(km) · 선택</label>
+    <input class="time-inp" type="text" inputmode="numeric" id="closeKm">
+    <p class="record-tip" id="closeError" role="status"></p>
+    <div class="btn-row">
+      <button class="sbtn sec" onclick="hideOverlay('closeWorkOv')">취소</button>
+      <button class="sbtn primary" onclick="confirmWorkClose()">마감 확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov result-modal" id="startWorkOv">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="startWorkTitle">
+    <div class="mo-title" id="startWorkTitle">새 세션의 근무일 선택</div>
+    <div class="btn-row">
+      <button class="sbtn sec" id="continueClosedBtn" onclick="startWorkSession(workDay.lastClosed.date)"></button>
+      <button class="sbtn primary" id="startTodayBtn" onclick="startWorkSession(todayStr())"></button>
+    </div>
+    <button class="sbtn sec" style="margin-top:8px;width:100%" onclick="hideOverlay('startWorkOv')">취소</button>
   </div>
 </div>
 
@@ -458,7 +307,7 @@ body.exer-mode{background:#1a0d08;}
 
     <!-- 오늘 누적 -->
     <div class="result-section">
-      <div class="result-section-title">오늘 누적</div>
+      <div class="result-section-title" id="res-work-date">근무일 누적</div>
       <div class="result-row">
         <span class="result-key">누적 수입</span>
         <span class="result-val" id="res-today-total">--</span>
@@ -491,15 +340,6 @@ body.exer-mode{background:#1a0d08;}
   </div>
 </div>
 
-<!-- 수면/운동 상세 모달 -->
-<div class="ov result-modal" id="lifeDetailOv">
-  <div class="modal">
-    <div class="mo-title">세션 상세</div>
-    <div id="life-detail-body"></div>
-    <button class="sbtn primary" onclick="document.getElementById('lifeDetailOv').classList.remove('show')" style="width:100%;">확인</button>
-  </div>
-</div>
-
 <!-- 이어서 모달 -->
 <div class="ov resume-modal" id="resumeOv">
   <div class="modal">
@@ -518,12 +358,12 @@ const GAS_URL = 'https://script.google.com/macros/s/AKfycbyd1KSpAxzkce_4MnQenji5
 const DAILY_GOAL_DEFAULT = 150000; // 목표탭에서 계산 전 기본값
 
 let timerState = JSON.parse(localStorage.getItem('ts2') || 'null');
-let timerInterval = null, notifyTimer = null;
-let selectedCat = null, selectedLoc = '';
-let currentTab = 'work';
-let todaySessions = JSON.parse(localStorage.getItem('today_sessions') || '[]');
-let lastSavedRecord = null;
-let workListCache = [], lifeListCache = {};
+let timerInterval = null;
+let stoppedAt;
+let workDay = JSON.parse(localStorage.getItem('delivery_work_day') || '{}');
+let syncingWork = false;
+let syncRequested = false;
+const payFields = ['baemin_basic','baemin_promo','baemin_count','coupang_basic','coupang_promo','coupang_count'];
 
 // ── 유틸 ──
 function p2(n){ return String(n).padStart(2,'0'); }
@@ -536,31 +376,64 @@ function fmtDuration(ms){
 function fmtMoney(n){ return n>=10000 ? `${Math.floor(n/10000)}만${n%10000>0?(n%10000/1000).toFixed(0)+'천':''}` : n.toLocaleString(); }
 function todayStr(){
   const d=new Date();
-  if(d.getHours()<3) d.setDate(d.getDate()-1); // 오전 3시 이전은 전날로 처리
   return `${String(d.getFullYear()).slice(2)}.${p2(d.getMonth()+1)}.${p2(d.getDate())}`;
 }
 
-// ── 오늘 세션 관리 ──
-function cleanTodaySessions(){
-  const today=todayStr();
-  todaySessions=todaySessions.filter(s=>s.date===today);
-  localStorage.setItem('today_sessions', JSON.stringify(todaySessions));
+function inputDate(date) {
+  return date.getFullYear() + '-' + p2(date.getMonth()+1) + '-' + p2(date.getDate());
 }
-function todayTotals(){
-  cleanTodaySessions();
-  let income=0, mins=0, count=0;
-  todaySessions.forEach(s=>{
-    income += s.totalPay||0;
-    const parts=(s.duration||'0:00').split(':');
-    mins += parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
-    count += s.totalCount||0;
-  });
-  return {income, mins, count, sessions:todaySessions.length};
+
+function legacyKey(record) {
+  return JSON.stringify([record.date, String(record.startTime).padStart(5,'0'),
+    String(record.endTime).padStart(5,'0'), workMinutes(record),
+    ...payFields.map(field => Number(record[field]) || 0)]);
+}
+
+function mergeWorkRecords(records) {
+  const byId = new Map();
+  const legacy = new Map();
+  for (const record of records) {
+    const key = legacyKey(record);
+    if (record.sessionId) byId.set(record.sessionId, record);
+    else legacy.set(key, record);
+  }
+  for (const record of byId.values()) {
+    if (!record.pending) legacy.delete(legacyKey(record));
+  }
+  return [...byId.values(), ...legacy.values()].sort((a, b) =>
+    b.date.localeCompare(a.date) ||
+    (b.startDate || b.date).localeCompare(a.startDate || a.date) ||
+    b.startTime.localeCompare(a.startTime));
+}
+
+function readWorkRecords() {
+  return JSON.parse(localStorage.getItem('work_recs') || '[]');
+}
+
+function storeWorkRecords(records) {
+  localStorage.setItem('work_recs', JSON.stringify(mergeWorkRecords(records)));
+}
+
+function workMinutes(record) {
+  const [hours, minutes] = String(record.duration || '0:00').split(':').map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function workDayTotals(date) {
+  const sessions = readWorkRecords().filter(record => record.date === date);
+  return {
+    income: sessions.reduce((sum, record) => sum + (Number(record.totalPay) || 0), 0),
+    mins: sessions.reduce((sum, record) => sum + workMinutes(record), 0),
+    count: sessions.reduce((sum, record) => sum + (Number(record.totalCount) || 0), 0),
+    sessions: sessions.length
+  };
 }
 
 // ── TOPBAR 업데이트 ──
 function updateTopbar(){
-  const t=todayTotals();
+  const date = workDay.openDate || todayStr();
+  const t = workDayTotals(date);
+  document.getElementById('statWorkDayLabel').textContent = date.slice(3) + ' 수입';
   document.getElementById('statToday').innerHTML=`${t.income.toLocaleString()}<small>원</small>`;
   document.getElementById('statTodaySub').textContent=`${t.sessions}세션 · ${t.count}건`;
 
@@ -569,80 +442,80 @@ function updateTopbar(){
   document.getElementById('statGoal').innerHTML=`${goal.toLocaleString()}<small>원</small>`;
   document.getElementById('statGoalSub').textContent=remain>0?`잔여 ${remain.toLocaleString()}`:'✓ 달성';
 
-  // 이달 시간 (로컬)
-  const allRecs=JSON.parse(localStorage.getItem('work_recs')||'[]');
-  let totalMins=0;
-  allRecs.forEach(r=>{const p=(r.duration||'0:00').split(':');totalMins+=parseInt(p[0]||0)*60+parseInt(p[1]||0);});
+  const month = todayStr().slice(0,5);
+  const totalMins = readWorkRecords().filter(record => record.date.startsWith(month + '.'))
+    .reduce((sum, record) => sum + workMinutes(record), 0);
   const h=(totalMins/60).toFixed(1);
   document.getElementById('statMonth').innerHTML=`${h}<small>h</small>`;
   document.getElementById('statMonthSub').textContent=`목표 225h · ${Math.min(100,(totalMins/60/225*100)).toFixed(0)}%`;
+}
+
+function renderWorkDay() {
+  const status = document.getElementById('workDayStatus');
+  const last = workDay.lastClosed;
+  status.textContent = workDay.openDate
+    ? workDay.openDate + ' 근무일 열림'
+    : last
+      ? last.date + ' 근무 마감 완료'
+      : '세션을 저장하면 근무일이 열립니다.';
+  document.getElementById('closeWorkDayBtn').disabled = !workDay.openDate || !!timerState?.running;
+}
+
+function hideOverlay(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+function closeWorkDay() {
+  if (!workDay.openDate || timerState?.running) return;
+  document.getElementById('closeWorkTitle').textContent = workDay.openDate + ' 근무 마감';
+  document.getElementById('closeKm').value = '';
+  document.getElementById('closeError').textContent = '';
+  document.getElementById('closeWorkOv').classList.add('show');
+}
+
+function confirmWorkClose() {
+  if (!workDay.openDate || timerState?.running) return;
+  const input = document.getElementById('closeKm').value.trim();
+  if (input && (!/^\d+$/.test(input) || !Number.isSafeInteger(Number(input)))) {
+    document.getElementById('closeError').textContent = '누적 계기판을 숫자로 입력하세요.';
+    return;
+  }
+  const close = {
+    date:workDay.openDate, closeId:newSessionId(), closedAt:new Date().toISOString(), km:input
+  };
+  const pendingCloses = [...(workDay.pendingCloses || []), close];
+  if (saveWorkDay({...workDay, openDate:'', lastClosed:close, pendingCloses})) {
+    hideOverlay('closeWorkOv');
+    renderWork();
+    syncWorkRecords();
+  }
+}
+
+function saveWorkDay(state) {
+  try {
+    localStorage.setItem('delivery_work_day', JSON.stringify(state));
+    workDay = state;
+    return true;
+  } catch (err) {
+    window.alert('근무일 상태를 기기에 저장할 수 없습니다.');
+    return false;
+  }
 }
 
 function getDailyGoal(){
   return parseInt(localStorage.getItem('daily_goal')||DAILY_GOAL_DEFAULT);
 }
 
-// ── 알림 ──
-function saveNotifyInterval(){
-  localStorage.setItem('notify_interval', parseInt(document.getElementById('notifyInterval').value)||60);
-}
-function loadNotifyInterval(){
-  const v=localStorage.getItem('notify_interval')||'60';
-  document.getElementById('notifyInterval').value=v;
-  return parseInt(v);
-}
-async function reqNotify(){
-  if(!('Notification' in window))return false;
-  if(Notification.permission==='granted')return true;
-  if(Notification.permission==='denied')return false;
-  return (await Notification.requestPermission())==='granted';
-}
-function startNotify(){
-  clearInterval(notifyTimer);
-  const mins=loadNotifyInterval();
-  notifyTimer=setInterval(async()=>{
-    if(!timerState?.running)return;
-    const el=new Date()-new Date(timerState.startTime);
-    const h=Math.floor(el/3600000),m=Math.floor((el%3600000)/60000);
-    if(await reqNotify()) new Notification('💼 근무 중',{body:`${h}시간 ${m}분 경과`});
-  }, mins*60*1000);
-}
-function stopNotify(){clearInterval(notifyTimer);notifyTimer=null;}
-
 // ── INIT ──
-document.addEventListener('DOMContentLoaded', async ()=>{
-  loadNotifyInterval();
+document.addEventListener('DOMContentLoaded', () => {
+  const oldToday = JSON.parse(localStorage.getItem('today_sessions') || '[]');
+  storeWorkRecords([...oldToday, ...readWorkRecords()]);
+  localStorage.removeItem('today_sessions');
   checkResume();
-  updateTopbar();
-  await syncTodaySessionsFromGAS();
-  loadWorkSessionsGAS();
+  refreshWork();
 });
 
-async function syncTodaySessionsFromGAS(){
-  try{
-    const res = await fetch(`${GAS_URL}?action=loadWorkSessions&days=2`);
-    const data = await res.json();
-    if(data.records && data.records.length > 0){
-      const today = todayStr();
-      const numFields = ['baemin_basic','baemin_promo','baemin_count',
-                         'coupang_basic','coupang_promo','coupang_count',
-                         'totalPay','totalCount'];
-      const gasToday = data.records
-        .filter(r => r.date === today)
-        .map(r => {
-          const rec = {...r};
-          numFields.forEach(f => rec[f] = parseInt(rec[f])||0);
-          return rec;
-        });
-      if(gasToday.length > 0){
-        todaySessions = gasToday;
-        localStorage.setItem('today_sessions', JSON.stringify(todaySessions));
-      }
-    }
-  } catch(e){
-    console.warn('GAS 동기화 실패, 로컬 사용');
-  }
-}
+window.addEventListener('online', refreshWork);
 
 function checkResume(){
   if(!timerState?.running)return;
@@ -655,7 +528,7 @@ function checkResume(){
 }
 function continueTimer(){
   document.getElementById('resumeOv').classList.remove('show');
-  startVisual();startInterval();startNotify();
+  startVisual();startInterval();
 }
 function restartTimer(){
   document.getElementById('resumeOv').classList.remove('show');
@@ -663,16 +536,30 @@ function restartTimer(){
 }
 
 // ── 타이머 ──
-function handleTimerClick(){
-  if(!timerState?.running){
-    timerState={startTime:new Date().toISOString(),running:true};
-    localStorage.setItem('ts2',JSON.stringify(timerState));
-    startVisual();startInterval();startNotify();
-  } else {
+function handleTimerClick() {
+  if (timerState?.running) {
     clearInterval(timerInterval);
     openEndModal();
+    return;
   }
+  if (!workDay.openDate && workDay.lastClosed) {
+    document.getElementById('continueClosedBtn').textContent = workDay.lastClosed.date + ' 근무에 추가';
+    document.getElementById('startTodayBtn').textContent = todayStr() + ' 새 근무';
+    document.getElementById('startWorkOv').classList.add('show');
+    return;
+  }
+  startWorkSession(workDay.openDate || todayStr());
 }
+
+function startWorkSession(workDate) {
+  if (timerState?.running) return;
+  hideOverlay('startWorkOv');
+  timerState = {startTime:new Date().toISOString(),running:true,sessionId:newSessionId(),workDate};
+  localStorage.setItem('ts2',JSON.stringify(timerState));
+  startVisual();
+  startInterval();
+}
+
 function startInterval(){
   clearInterval(timerInterval);
   timerInterval=setInterval(updateTimerDisplay,1000);
@@ -689,229 +576,155 @@ function updateTimerDisplay(){
 function startVisual(){
   document.getElementById('timerBtn').classList.add('on');
   document.getElementById('timerIcon').textContent='⏹';
-  document.getElementById('timerState').textContent='TAP TO STOP';
+  document.getElementById('timerState').textContent='세션 종료';
   document.getElementById('ringFill').style.stroke='#6366f1';
   document.getElementById('ringFill').classList.add('pulse');
   document.body.className='running';
-  reqNotify();
+  renderWorkDay();
 }
 function resetVisual(){
   document.getElementById('timerBtn').classList.remove('on');
   document.getElementById('timerIcon').textContent='⏱';
   document.getElementById('timerTime').textContent='00:00:00';
-  document.getElementById('timerState').textContent='TAP TO START';
+  document.getElementById('timerState').textContent='세션 시작';
   document.getElementById('ringFill').style.strokeDashoffset=534;
   document.getElementById('ringFill').style.stroke='';
   document.getElementById('ringFill').classList.remove('pulse');
-  document.getElementById('curAct').classList.remove('show');
   document.body.className='';
+  renderWorkDay();
 }
 
 // ── 종료 모달 ──
-function openEndModal(){
-  selectedCat=null;selectedLoc='';
-  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('sel'));
-  document.getElementById('workInputs').classList.remove('show');
-  document.getElementById('locGrid').classList.remove('show');
-  ['baemin_basic','baemin_promo','baemin_count','coupang_basic','coupang_promo','coupang_count'].forEach(id=>{
-    document.getElementById(id).value='';
-  });
-  document.getElementById('saveBtn').disabled=true;
+function newSessionId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+    byte.toString(16).padStart(2, '0')).join('');
+}
 
-  // 시간 pre-fill
-  const now=new Date();
-  const startBase=timerState?new Date(timerState.startTime):now;
-  document.getElementById('edit_start').value=fmtTime(startBase);
-  document.getElementById('edit_end').value=fmtTime(now);
-
+function openEndModal() {
+  stoppedAt = new Date();
+  const start = new Date(timerState.startTime);
+  document.getElementById('edit_start_date').value = inputDate(start);
+  document.getElementById('edit_end_date').value = inputDate(stoppedAt);
+  document.getElementById('edit_start').value = fmtTime(start);
+  document.getElementById('edit_end').value = fmtTime(stoppedAt);
+  const workDate = timerState.workDate || workDay.openDate;
+  document.getElementById('edit_work_date').value = workDate
+    ? '20' + workDate.replace(/\./g, '-')
+    : inputDate(start);
+  document.getElementById('recordError').textContent = '';
   document.getElementById('endOv').classList.add('show');
 }
-function selectCat(cat){
-  selectedCat=cat;
-  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('sel'));
-  document.querySelector(`.cat-btn.${cat}`).classList.add('sel');
-  document.getElementById('workInputs').classList.toggle('show',cat==='work');
-  document.getElementById('locGrid').classList.toggle('show',cat==='exer');
-  document.getElementById('sqSection').style.display=cat==='sleep'?'block':'none';
-  if(cat==='sleep') autoSuggestSleepQuality();
-  if(cat==='work') showPrevCumHint();
-  document.getElementById('saveBtn').disabled=false;
-  document.body.className=`running ${cat==='work'?'':''}`;
-  const colors={work:'#6366f1',sleep:'var(--sleep)',exer:'var(--exer)'};
-  document.getElementById('ringFill').style.stroke=colors[cat]||'#6366f1';
+
+function workDateFromInput() {
+  return document.getElementById('edit_work_date').value.slice(2).replace(/-/g, '.');
 }
 
-function autoSuggestSleepQuality(){
-  const startVal=document.getElementById('edit_start').value;
-  const endVal=document.getElementById('edit_end').value;
-  if(!startVal||!endVal) return;
-  const base=timerState?new Date(timerState.startTime):new Date();
-  const start=parseTimeOnDate(base,startVal);
-  const end=parseTimeOnDate(base,endVal);
-  if(end<=start) end.setDate(end.getDate()+1);
-  const hours=(end-start)/3600000;
-  let q='적정';
-  if(hours<6) q='부족';
-  else if(hours<7) q='보통';
-  else if(hours>9) q='과수면';
-  document.getElementById('sleepQuality').value=q;
-  document.getElementById('sqHint').textContent=`${hours.toFixed(1)}시간 기준 자동 설정`;
-}
-function showPrevCumHint(){
-  cleanTodaySessions();
-  const el=document.getElementById('prevCumHint');
-  if(!todaySessions.length){el.style.display='none';return;}
-  const prevBB=todaySessions.reduce((s,r)=>s+(r.baemin_basic||0),0);
-  const prevCB=todaySessions.reduce((s,r)=>s+(r.coupang_basic||0),0);
-  const prevBC=todaySessions.reduce((s,r)=>s+(r.baemin_count||0),0);
-  const prevCC=todaySessions.reduce((s,r)=>s+(r.coupang_count||0),0);
-  const parts=[];
-  if(prevBB>0) parts.push(`배민 ${prevBB.toLocaleString()}원 / ${prevBC}건`);
-  if(prevCB>0) parts.push(`쿠팡 ${prevCB.toLocaleString()}원 / ${prevCC}건`);
-  el.textContent=`이전 누적: ${parts.join(' · ')} → 입력값에서 차감됩니다`;
-  el.style.display=parts.length?'block':'none';
-}
-
-function selectLoc(loc){
-  selectedLoc=loc;
-  document.querySelectorAll('.loc-btn').forEach(b=>b.classList.remove('sel'));
-  document.querySelector(`.loc-btn[onclick="selectLoc('${loc}')"]`).classList.add('sel');
-}
 function cancelEnd(){
   document.getElementById('endOv').classList.remove('show');
   startInterval();
 }
 function discardEnd(){
   document.getElementById('endOv').classList.remove('show');
-  stopNotify();timerState=null;localStorage.removeItem('ts2');
+  timerState=null;localStorage.removeItem('ts2');
   clearInterval(timerInterval);resetVisual();
 }
 
-// ── 시간 파싱 헬퍼 ──
-function parseTimeOnDate(dateBase, timeStr){
-  if(!timeStr) return new Date(dateBase);
-  const d=new Date(dateBase);
-  const [h,m]=(timeStr+':00').split(':').map(Number);
-  d.setHours(h,m,0,0);
-  return d;
+function readEditedTime(field, original) {
+  const date = document.getElementById('edit_' + field + '_date').value;
+  const time = document.getElementById('edit_' + field).value;
+  if (date === inputDate(original) && time === fmtTime(original)) return original;
+  return new Date(date && time ? date + 'T' + time : NaN);
 }
 
-// ── 저장 ──
-function saveRecord(){
-  if(!selectedCat||!timerState)return;
+function saveRecord() {
+  if (!timerState?.running) return;
+  const error = document.getElementById('recordError');
+  const start = readEditedTime('start', new Date(timerState.startTime));
+  const end = readEditedTime('end', stoppedAt);
+  const date = workDateFromInput();
+  if (!date || !(end > start)) {
+    error.textContent = '근무일과 시작·종료 날짜를 확인하세요. 종료는 시작보다 늦어야 합니다.';
+    return;
+  }
 
-  const startBase=new Date(timerState.startTime);
-  const startVal=document.getElementById('edit_start').value;
-  const endVal=document.getElementById('edit_end').value;
-
-  const start=parseTimeOnDate(startBase, startVal||fmtTime(startBase));
-  const end=parseTimeOnDate(startBase, endVal||fmtTime(new Date()));
-
-  // 자정 넘김 처리 (종료 < 시작이면 +1일)
-  if(end<=start) end.setDate(end.getDate()+1);
-
-  const dur=end-start;
-
-  let record={
-    date:fmtDate(start),
-    startTime:fmtTime(start),
-    endTime:fmtTime(end),
-    duration:fmtDuration(dur),
-    cat:selectedCat
+  const record = {
+    date, sessionId:timerState.sessionId || newSessionId(), pending:true, awaitingResults:true,
+    startDate:fmtDate(start), endDate:fmtDate(end), startTime:fmtTime(start),
+    endTime:fmtTime(end), duration:fmtDuration(end - start),
+    totalPay:null, totalCount:null, points:null
   };
 
-  if(selectedCat==='work'){
-    const bb=parseInt(document.getElementById('baemin_basic').value)||0;
-    const bp=parseInt(document.getElementById('baemin_promo').value)||0;
-    const bc=parseInt(document.getElementById('baemin_count').value)||0;
-    const cb=parseInt(document.getElementById('coupang_basic').value)||0;
-    const cp=parseInt(document.getElementById('coupang_promo').value)||0;
-    const cc=parseInt(document.getElementById('coupang_count').value)||0;
-
-    // 오늘 직전 세션 누적합 계산
-    cleanTodaySessions();
-    const prevBB=todaySessions.reduce((s,r)=>s+(r.baemin_basic||0),0);
-    const prevBP=todaySessions.reduce((s,r)=>s+(r.baemin_promo||0),0);
-    const prevBC=todaySessions.reduce((s,r)=>s+(r.baemin_count||0),0);
-    const prevCB=todaySessions.reduce((s,r)=>s+(r.coupang_basic||0),0);
-    const prevCP=todaySessions.reduce((s,r)=>s+(r.coupang_promo||0),0);
-    const prevCC=todaySessions.reduce((s,r)=>s+(r.coupang_count||0),0);
-
-  
-// 순수 세션값 (음수 방지)
-    const netBB=Math.max(0,bb-prevBB);
-    const netBP=bp;  // 프로모는 독립값
-    const netBC=Math.max(0,bc-prevBC);
-    const netCB=Math.max(0,cb-prevCB);
-    const netCP=cp;  // 프로모는 독립값
-    const netCC=Math.max(0,cc-prevCC);
-
-    record={...record,
-      baemin_basic:netBB, baemin_promo:netBP, baemin_count:netBC,
-      coupang_basic:netCB, coupang_promo:netCP, coupang_count:netCC,
-      totalPay:netBB+netBP+netCB+netCP,
-      totalCount:netBC+netCC
-    };
-  
-  } else {
-    record.exerciseType=selectedCat==='exer'?selectedLoc:'';
-    if(selectedCat==='sleep') record.sleepQuality=document.getElementById('sleepQuality').value;
+  try {
+    storeWorkRecords([...readWorkRecords(), record]);
+  } catch (err) {
+    error.textContent = '기기에 기록을 저장할 수 없습니다. 저장 공간을 확인하고 다시 시도하세요.';
+    return;
   }
-
-  lastSavedRecord=record;
-
-  // 오늘 세션에 추가
-  if(selectedCat==='work'){
-    todaySessions.push(record);
-    localStorage.setItem('today_sessions',JSON.stringify(todaySessions));
-  }
-
-  // 로컬 기록 저장
-  const key=`${selectedCat}_recs`;
-  const recs=JSON.parse(localStorage.getItem(key)||'[]');
-  recs.unshift(record);if(recs.length>20)recs.splice(20);
-  localStorage.setItem(key,JSON.stringify(recs));
-  // 호환용
-  const wrecs=JSON.parse(localStorage.getItem('work_recs')||'[]');
-  if(selectedCat==='work'){wrecs.unshift(record);if(wrecs.length>100)wrecs.splice(100);localStorage.setItem('work_recs',JSON.stringify(wrecs));}
- 
-
-  // GAS 전송
-  sendToGAS(record);
-
-  stopNotify();timerState=null;localStorage.removeItem('ts2');
-  clearInterval(timerInterval);resetVisual();
+  if (workDay.openDate !== date) saveWorkDay({...workDay, openDate: date});
+  timerState = null;
+  localStorage.removeItem('ts2');
+  clearInterval(timerInterval);
+  resetVisual();
   document.getElementById('endOv').classList.remove('show');
-  updateTopbar();
-  renderWorkList();
-
-  if(selectedCat==='work') showResult(record);
-  switchTab(selectedCat);
+  renderWork();
+  showResult(record);
+  syncWorkRecords();
 }
 
-// ── GAS ──
-async function sendToGAS(record){
-  try{
-    let params;
-    if(record.cat==='work'){
-      params=new URLSearchParams({action:'saveWorkSession',...record});
-    } else {
-      const codeMap={sleep:1,exer:3};
-      const actMap={sleep:'수면',exer:'운동'};
-      params=new URLSearchParams({
-        date:record.date,
-        time:record.endTime,
-        code:codeMap[record.cat]||0,
-        activity:actMap[record.cat]||'',
-        startTime:record.startTime,
-        endTime:record.endTime,
-        duration:record.duration,
-        exerciseType:record.exerciseType||'',
-        sleepQuality:record.sleepQuality||''
-      });
-    }
-    await fetch(GAS_URL+'?'+params.toString());
-  }catch(e){console.warn('GAS 전송 오류',e);}
+async function workRequest(params) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch(GAS_URL + '?' + new URLSearchParams(params), {
+      signal: controller.signal, cache: 'no-store'
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const result = await response.json();
+    if (result.error) throw new Error(result.error);
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function syncWorkRecords() {
+  if (syncingWork) {
+    syncRequested = true;
+    return;
+  }
+  syncingWork = true;
+  const status = document.getElementById('sheetSyncStatus');
+  try {
+    do {
+      syncRequested = false;
+      const pending = readWorkRecords().filter(record => record.pending);
+      const closes = workDay.pendingCloses || [];
+      if (!pending.length && !closes.length) break;
+      status.textContent = '시트 전송 중 · ' + (pending.length + closes.length) + '건';
+      for (const {pending: ignored, ...record} of pending) {
+        const result = await workRequest({action:'saveWorkSessionV3', ...record});
+        if (!result.saved || result.sessionId !== record.sessionId) {
+          throw new Error('저장 확인 실패');
+        }
+        storeWorkRecords(readWorkRecords().map(current =>
+          current.sessionId === record.sessionId ? {...current, pending:false} : current));
+        renderWork();
+      }
+      for (const close of closes) {
+        const result = await workRequest({action:'saveDeliveryClose', ...close});
+        if (!result.saved || result.closeId !== close.closeId) throw new Error('마감 저장 확인 실패');
+        const pendingCloses = (workDay.pendingCloses || []).filter(item => item.closeId !== close.closeId);
+        if (!saveWorkDay({...workDay, pendingCloses})) throw new Error('기기 상태 저장 실패');
+      }
+      status.textContent = '시트 저장 완료';
+    } while (syncRequested);
+  } catch (err) {
+    const count = readWorkRecords().filter(record => record.pending).length + (workDay.pendingCloses || []).length;
+    status.textContent = '기기에 저장됨 · 시트 전송 대기 ' + count + '건 · ↻ 다시 시도';
+    console.warn('근무 기록 동기화 실패', err);
+  } finally {
+    syncingWork = false;
+  }
 }
 
 // ── 세션 결과 ──
@@ -919,21 +732,22 @@ function showResult(rec){
   const dur=rec.duration;
   const parts=dur.split(':');
   const hours=parseInt(parts[0]||0)+parseInt(parts[1]||0)/60;
-  const bTotal=(parseInt(rec.baemin_basic)||0)+(parseInt(rec.baemin_promo)||0);
-  const cTotal=(parseInt(rec.coupang_basic)||0)+(parseInt(rec.coupang_promo)||0);
-  const total=parseInt(rec.totalPay)||0;
-  const count=parseInt(rec.totalCount)||0;
+  const bTotal=(Number(rec.baemin_basic)||0)+(Number(rec.baemin_promo)||0);
+  const cTotal=(Number(rec.coupang_basic)||0)+(Number(rec.coupang_promo)||0);
+  const total=Number(rec.totalPay)||0;
+  const count=Number(rec.totalCount)||0;
   const perCount=count>0?Math.round(total/count):0;
   const perHour=hours>0?Math.round(total/hours):0;
 
   document.getElementById('res-duration').textContent=dur;
   document.getElementById('res-baemin').textContent=bTotal>0?bTotal.toLocaleString()+'원':'-';
   document.getElementById('res-coupang').textContent=cTotal>0?cTotal.toLocaleString()+'원':'-';
-  document.getElementById('res-total').textContent=total.toLocaleString()+'원';
+  document.getElementById('res-total').textContent=rec.awaitingResults ? '실적 입력 대기' : total.toLocaleString()+'원';
   document.getElementById('res-per-count').textContent=perCount>0?perCount.toLocaleString()+'원':'-';
   document.getElementById('res-per-hour').textContent=perHour>0?perHour.toLocaleString()+'원':'-';
 
-  const t=todayTotals();
+  const t = workDayTotals(rec.date);
+  document.getElementById('res-work-date').textContent = rec.date + ' 근무일 누적';
   const todayH=(t.mins/60).toFixed(1);
   document.getElementById('res-today-total').textContent=t.income.toLocaleString()+'원';
   document.getElementById('res-today-hours').textContent=todayH+'h · '+t.count+'건';
@@ -948,7 +762,7 @@ function showResult(rec){
   document.getElementById('res-achieve-pct').textContent=pct.toFixed(0)+'%';
   document.getElementById('res-goal-label').textContent='목표 '+goal.toLocaleString();
 
-  if(remain>0 && t.mins>0){
+  if(remain>0 && t.mins>0 && t.income>0){
     const ratePerMin=t.income/t.mins;
     const minsNeeded=Math.ceil(remain/ratePerMin);
     const h=Math.floor(minsNeeded/60),m=minsNeeded%60;
@@ -964,113 +778,69 @@ function showResult(rec){
 function closeResult(){document.getElementById('resultOv').classList.remove('show');}
 
 // ── 기록 렌더링 ──
-function loadWorkSessions(){
-  const recs=JSON.parse(localStorage.getItem('work_recs')||'[]');
-  renderWorkList(recs);
-  const statusEl=document.getElementById('status-work');
-  if(statusEl) statusEl.textContent=recs.length+'건 (로컬)';
-}
-function renderWorkList(recs){
-  if(!recs) recs=JSON.parse(localStorage.getItem('work_recs')||'[]');
-  workListCache=recs;
-  const list=document.getElementById('list-work');
-  if(!recs.length){list.innerHTML='<div class="empty">기록 없음</div>';return;}
-  list.innerHTML=recs.slice(0,10).map((r,i,arr)=>{
-    const bTotal=(parseInt(r.baemin_basic)||0)+(parseInt(r.baemin_promo)||0);
-    const cTotal=(parseInt(r.coupang_basic)||0)+(parseInt(r.coupang_promo)||0);
-    const sub=`<span class="rec-r baemin">${bTotal>0?'배'+bTotal.toLocaleString():''}</span> <span class="rec-r coupang">${cTotal>0?'쿠'+cTotal.toLocaleString():''}</span>`;
-    return `<div class="rec-item" onclick="viewWorkRecord(${i})">
-      <div>
-        <div class="rec-l">${r.date} ${r.startTime}–${r.endTime} (${r.duration})</div>
-        <div style="display:flex;gap:8px;margin-top:2px;">${sub}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-function viewWorkRecord(i){
-  showResult(workListCache[i]);
-}
-
-function loadLifeRecords(type){
-  const recs=JSON.parse(localStorage.getItem(type+'_recs')||'[]');
-  lifeListCache[type]=recs;
-  const list=document.getElementById('list-'+type);
-  if(!recs.length){list.innerHTML='<div class="empty">기록 없음</div>';return;}
-  const sqColor={부족:'#f87171',보통:'var(--dim)',적정:'var(--sleep)',과수면:'#fb923c'};
-  list.innerHTML=recs.slice(0,10).map((r,i)=>{
-    const right=type==='sleep'&&r.sleepQuality
-      ? `${r.duration} <span style="color:${sqColor[r.sleepQuality]||'var(--dim)'}">${r.sleepQuality}</span>`
-      : `${r.duration}${r.exerciseType?' · '+r.exerciseType:''}`;
-    return `<div class="rec-item" onclick="viewLifeRecord('${type}',${i})">
-      <span class="rec-l">${r.date} ${r.startTime}–${r.endTime}</span>
-      <span class="rec-r">${right}</span>
-    </div>`;
-  }).join('');
-  const statusEl=document.getElementById('status-'+type);
-  if(statusEl) statusEl.textContent=recs.length+'건';
-}
-function viewLifeRecord(type, i){
-  const r=lifeListCache[type]?.[i];
-  if(!r) return;
-  const sqColor={부족:'#f87171',보통:'var(--dim)',적정:'#4ade80',과수면:'#fb923c'};
-  const icon=type==='sleep'?'😴':'💪';
-  const typeLabel=type==='sleep'?'수면':'운동';
-  let extra='';
-  if(type==='sleep'&&r.sleepQuality){
-    extra=`<div class="result-row"><span class="result-key">수면질</span><span class="result-val" style="color:${sqColor[r.sleepQuality]||'var(--dim)'}">${r.sleepQuality}</span></div>`;
-  } else if(type==='exer'&&r.exerciseType){
-    extra=`<div class="result-row"><span class="result-key">종류</span><span class="result-val">${r.exerciseType}</span></div>`;
-  }
-  document.getElementById('life-detail-body').innerHTML=`
-    <div class="result-section">
-      <div class="result-section-title">${icon} ${typeLabel} 세션</div>
-      <div class="result-row"><span class="result-key">날짜</span><span class="result-val">${r.date}</span></div>
-      <div class="result-row"><span class="result-key">시간</span><span class="result-val">${r.startTime} ~ ${r.endTime}</span></div>
-      <div class="result-row"><span class="result-key">총 시간</span><span class="result-val">${r.duration}</span></div>
-      ${extra}
-    </div>`;
-  document.getElementById('lifeDetailOv').classList.add('show');
-}
-
-// ── 기간 선택 ──
 let currentPeriod = 7;
-function setPeriod(days){
-  currentPeriod = days;
-  document.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('period-'+days).classList.add('active');
-  loadWorkSessionsGAS();
-}
+let loadingWork = false;
 
-async function loadWorkSessionsGAS(){
-  const statusEl = document.getElementById('status-work');
+function renderWork() {
+  updateTopbar();
+  renderWorkDay();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - currentPeriod + 1);
+  const date = fmtDate(cutoff);
+  const records = readWorkRecords().filter(record => record.date >= date);
   const list = document.getElementById('list-work');
-  if(statusEl) statusEl.textContent = '불러오는 중...';
-  try{
-    const res = await fetch(`${GAS_URL}?action=loadWorkSessions&days=${currentPeriod}`);
-    const data = await res.json();
-    if(data.records && data.records.length > 0){
-      renderWorkList(data.records);
-      if(statusEl) statusEl.textContent = `${data.records.length}건 · 최근 ${currentPeriod}일`;
-    } else {
-      list.innerHTML = '<div class="empty">기록 없음</div>';
-      if(statusEl) statusEl.textContent = '데이터 없음';
-    }
-  } catch(e){
-    if(statusEl) statusEl.textContent = '불러오기 실패';
-    loadWorkSessions(); // 실패 시 로컬 fallback
+  list.replaceChildren();
+  if (!records.length) {
+    list.textContent = '기록 없음';
+    return;
   }
+  records.forEach(record => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'rec-item work-record';
+    const dates = record.startDate && record.endDate && (record.startDate !== record.date || record.endDate !== record.date)
+      ? ' · 실제 ' + record.startDate + ' → ' + record.endDate : '';
+    const label = document.createElement('span');
+    label.className = 'rec-l';
+    label.textContent = record.date + ' 근무 · ' + record.startTime + '–' + record.endTime + dates +
+      (record.pending ? ' · 전송 대기' : '');
+    const amount = document.createElement('span');
+    amount.className = 'rec-r';
+    amount.textContent = record.awaitingResults
+      ? '실적 입력 대기'
+      : (Number(record.totalPay) || 0).toLocaleString() + '원';
+    item.append(label, amount);
+    item.addEventListener('click', () => showResult(record));
+    list.append(item);
+  });
 }
 
-// ── 탭 전환 ──
-function switchTab(tab){
-  currentTab=tab;
-  document.querySelectorAll('.tnb').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-  document.querySelector(`.tnb.${tab}`).classList.add('active');
-  document.getElementById('pane-'+tab).classList.add('active');
-  if(tab==='work') loadWorkSessionsGAS();
-  if(tab==='sleep') loadLifeRecords('sleep');
-  if(tab==='exer') loadLifeRecords('exer');
+function setPeriod(days) {
+  currentPeriod = days;
+  document.querySelectorAll('.period-btn').forEach(button =>
+    button.classList.toggle('active', button.id === 'period-' + days));
+  renderWork();
+}
+
+async function refreshWork() {
+  renderWork();
+  syncWorkRecords();
+  if (loadingWork) return;
+  loadingWork = true;
+  const status = document.getElementById('status-work');
+  try {
+    status.textContent = '시트 불러오는 중…';
+    const data = await workRequest({action:'loadWorkSessions', days:31});
+    if (!Array.isArray(data.records)) throw new Error('Invalid records');
+    const remote = data.records.map(record => ({...record, pending:false}));
+    storeWorkRecords([...readWorkRecords(), ...remote]);
+    renderWork();
+    status.textContent = '시트 기록을 불러왔습니다';
+  } catch (err) {
+    status.textContent = '시트 연결 실패 · 기기에 저장된 기록 표시';
+  } finally {
+    loadingWork = false;
+  }
 }
 </script>
 </body>

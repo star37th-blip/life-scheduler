@@ -34,7 +34,17 @@ body.running{background:#0a0d1a;}
   color:#0b1220;background:#93c5fd;font-size:14px;font-weight:750;cursor:pointer;
 }
 .timer-btn.on{background:#fbc179;color:#271406;}
-.timer-btn:focus-visible,.sbtn:focus-visible{outline:2px solid #e0f2fe;outline-offset:2px;}
+.timer-actions{display:flex;align-items:center;gap:8px;}
+.break-btn{
+  min-height:44px;padding:0 12px;border-radius:8px;border:1px solid #475569;background:#172033;
+  color:var(--tx);font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+@media(max-width:360px){
+  .t-time{font-size:21px;}
+  .timer-btn{min-width:0;padding:0 10px;}
+  .break-btn{padding:0 10px;}
+}
+.timer-btn:focus-visible,.break-btn:focus-visible,.sbtn:focus-visible{outline:2px solid #e0f2fe;outline-offset:2px;}
 .topbar{padding:12px 16px 8px;flex-shrink:0;}
 .summary-date{font-size:13px;color:#b4bac4;margin-bottom:8px;}
 .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
@@ -157,7 +167,10 @@ body.running{background:#0a0d1a;}
     <span class="timer-caption" id="timerCaption">대기 중</span>
     <span class="t-time" id="timerTime">00:00:00</span>
   </div>
-  <button type="button" class="timer-btn" id="timerBtn" onclick="handleTimerClick()">세션 시작</button>
+  <div class="timer-actions">
+    <button type="button" class="break-btn" id="breakBtn" onclick="toggleSessionBreak()" hidden>휴식</button>
+    <button type="button" class="timer-btn" id="timerBtn" onclick="handleTimerClick()">세션 시작</button>
+  </div>
 </div>
 
 <section class="topbar" aria-labelledby="statWorkDayLabel">
@@ -211,13 +224,13 @@ body.running{background:#0a0d1a;}
     <div class="time-edit">
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_start_date">실제 시작</label>
-        <input class="time-inp" type="date" id="edit_start_date" onchange="loadPointBaseline()">
-        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각" onchange="loadPointBaseline()">
+        <input class="time-inp" type="date" id="edit_start_date" onchange="loadPointBaseline(); updateBreakSummary()">
+        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각" onchange="loadPointBaseline(); updateBreakSummary()">
       </div>
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_end_date">실제 종료</label>
-        <input class="time-inp" type="date" id="edit_end_date">
-        <input class="time-inp" type="time" id="edit_end" aria-label="종료 시각">
+        <input class="time-inp" type="date" id="edit_end_date" onchange="updateBreakSummary()">
+        <input class="time-inp" type="time" id="edit_end" aria-label="종료 시각" onchange="updateBreakSummary()">
       </div>
     </div>
     <div class="time-edit">
@@ -226,6 +239,7 @@ body.running{background:#0a0d1a;}
         <input class="time-inp" type="date" id="edit_work_date">
       </div>
     </div>
+    <p class="record-tip" id="breakSummary" hidden></p>
     <div id="manualResults">
       <p class="record-tip">이번 세션 실적 · 모르는 항목은 비워 두세요.</p>
       <fieldset>
@@ -579,10 +593,10 @@ window.addEventListener('online', refreshWork);
 function checkResume(){
   if(!timerState?.running)return;
   const start=new Date(timerState.startTime);
-  const el=new Date()-start;
+  const el = sessionWorkMs(start,new Date());
   const h=Math.floor(el/3600000),m=Math.floor((el%3600000)/60000);
-  document.getElementById('resumeAct').textContent='⏱ 기록 중';
-  document.getElementById('resumeDesc').textContent=`${fmtTime(start)} 시작 — ${h}h ${p2(m)}m 경과`;
+  document.getElementById('resumeAct').textContent = timerState.pauseStartedAt != null ? '휴식 중' : '⏱ 기록 중';
+  document.getElementById('resumeDesc').textContent=`${fmtTime(start)} 시작 — ${h}h ${p2(m)}m 근무`;
   document.getElementById('resumeOv').classList.add('show');
 }
 function continueTimer(){
@@ -619,14 +633,42 @@ function startWorkSession(workDate) {
   startInterval();
 }
 
+function sessionBreakMs(start, end) {
+  const overlap = (from, to) => Math.max(0, Math.min(+end,to) - Math.max(+start,from));
+  const completed = (timerState?.breaks || []).reduce((sum, period) =>
+    sum + overlap(period.start,period.end),0);
+  return completed + (timerState?.pauseStartedAt != null ? overlap(timerState.pauseStartedAt,+end) : 0);
+}
+
+function sessionWorkMs(start, end) {
+  return Math.max(0, end-start-sessionBreakMs(start,end));
+}
+
+function toggleSessionBreak() {
+  if (!timerState?.running) return;
+  const now = Date.now();
+  const from = timerState.pauseStartedAt;
+  const next = {...timerState, pauseStartedAt:from == null ? now : null};
+  if (from != null) next.breaks = [...(timerState.breaks || []),{start:from,end:now}];
+  try {
+    localStorage.setItem('ts2',JSON.stringify(next));
+  } catch {
+    window.alert('휴식 상태를 저장할 수 없습니다. 다시 시도하세요.');
+    return;
+  }
+  timerState = next;
+  startVisual();
+  startInterval();
+}
+
 function startInterval(){
   clearInterval(timerInterval);
-  timerInterval=setInterval(updateTimerDisplay,1000);
+  timerInterval = timerState?.pauseStartedAt == null ? setInterval(updateTimerDisplay,1000) : null;
   updateTimerDisplay();
 }
 function updateTimerDisplay(){
   if(!timerState)return;
-  const diff=new Date()-new Date(timerState.startTime);
+  const diff = sessionWorkMs(new Date(timerState.startTime),new Date());
   const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
   document.getElementById('timerTime').textContent=`${p2(h)}:${p2(m)}:${p2(s)}`;
 }
@@ -635,7 +677,11 @@ function startVisual() {
   const btn = document.getElementById('timerBtn');
   btn.classList.add('on');
   btn.textContent = '세션 종료';
-  document.getElementById('timerCaption').textContent = '근무 중';
+  const paused = timerState.pauseStartedAt != null;
+  const breakBtn = document.getElementById('breakBtn');
+  breakBtn.hidden = false;
+  breakBtn.textContent = paused ? '재개' : '휴식';
+  document.getElementById('timerCaption').textContent = paused ? '휴식 중' : '근무 중';
   document.body.className = 'running';
   renderWorkDay();
   updateTopbar();
@@ -645,6 +691,7 @@ function resetVisual() {
   const btn = document.getElementById('timerBtn');
   btn.classList.remove('on');
   btn.textContent = '세션 시작';
+  document.getElementById('breakBtn').hidden = true;
   document.getElementById('timerCaption').textContent = '대기 중';
   document.getElementById('timerTime').textContent = '00:00:00';
   document.body.className = '';
@@ -671,6 +718,7 @@ function openEndModal() {
     : inputDate(start);
   document.getElementById('recordError').textContent = '';
   resetResultInputs(stoppedAt);
+  updateBreakSummary();
   document.getElementById('endOv').classList.add('show');
 }
 
@@ -798,6 +846,16 @@ function readEditedTime(field, original) {
   return new Date(date && time ? date + 'T' + time : NaN);
 }
 
+function updateBreakSummary() {
+  const el = document.getElementById('breakSummary');
+  if (!timerState || !stoppedAt) return;
+  const start = readEditedTime('start',new Date(timerState.startTime));
+  const end = readEditedTime('end',stoppedAt);
+  const rest = end > start ? sessionBreakMs(start,end) : 0;
+  el.hidden = rest <= 0;
+  if (rest > 0) el.textContent = '휴식 ' + fmtDuration(rest) + ' 제외 · 저장 근무시간 ' + fmtDuration(sessionWorkMs(start,end));
+}
+
 function saveRecord() {
   if (!timerState?.running) return;
   const error = document.getElementById('recordError');
@@ -820,7 +878,7 @@ function saveRecord() {
   const record = {
     date, sessionId:timerState.sessionId || newSessionId(), pending:true,
     startDate:fmtDate(start), endDate:fmtDate(end), startTime:fmtTime(start),
-    endTime:fmtTime(end), duration:fmtDuration(end - start),
+    endTime:fmtTime(end), duration:fmtDuration(sessionWorkMs(start,end)),
     ...results
   };
 

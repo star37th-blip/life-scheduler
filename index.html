@@ -245,8 +245,8 @@ body.running{background:#0a0d1a;}
     <div class="time-edit">
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_start_date">실제 시작</label>
-        <input class="time-inp" type="date" id="edit_start_date" onchange="loadPointBaseline(); updateBreakSummary()">
-        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각" onchange="loadPointBaseline(); updateBreakSummary()">
+        <input class="time-inp" type="date" id="edit_start_date" onchange="loadPointBaseline(); updateBreakSummary(); previewSessionInputs()">
+        <input class="time-inp" type="time" id="edit_start" aria-label="시작 시각" onchange="loadPointBaseline(); updateBreakSummary(); previewSessionInputs()">
       </div>
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_end_date">실제 종료</label>
@@ -257,7 +257,7 @@ body.running{background:#0a0d1a;}
     <div class="time-edit">
       <div class="time-edit-group">
         <label class="time-edit-label" for="edit_work_date">근무일 (실적 합산 기준)</label>
-        <input class="time-inp" type="date" id="edit_work_date">
+        <input class="time-inp" type="date" id="edit_work_date" onchange="previewSessionInputs()">
       </div>
     </div>
     <details id="breakEdits" hidden>
@@ -276,13 +276,28 @@ body.running{background:#0a0d1a;}
     </fieldset>
     <p class="record-tip" id="breakSummary" role="status" hidden></p>
     <div id="manualResults">
-      <p class="record-tip">이번 세션 실적 · 모르는 항목은 비워 두세요.</p>
+      <div class="point-grid">
+        <label><span>수입 입력 기준</span>
+          <select class="time-inp" id="incomeBasis" onchange="previewSessionInputs()">
+            <option value="daily">근무일 누적 총액</option>
+            <option value="session">이번 세션 기본수입</option>
+          </select>
+        </label>
+        <label><span>건수 입력 기준</span>
+          <select class="time-inp" id="countBasis" onchange="previewSessionInputs()">
+            <option value="daily">근무일 누적</option>
+            <option value="session">이번 세션만</option>
+          </select>
+        </label>
+      </div>
+      <p class="record-tip">누적 총액에는 프로모션이 포함됩니다. 프로모션과 거절은 이번 세션 값만 적으세요.</p>
+      <p class="record-tip" id="sessionInputPreview" aria-live="polite"></p>
       <fieldset>
         <legend>배민</legend>
         <div class="entry-grid">
-          <label><span>기본 수입(원)</span><input class="time-inp" inputmode="numeric" id="baemin_basic"></label>
-          <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="baemin_promo"></label>
-          <label><span>수행 건수</span><input class="time-inp" inputmode="numeric" id="baemin_count" oninput="previewAcceptance()"></label>
+          <label><span id="baemin_basicLabel">누적 총액(원)</span><input class="time-inp" inputmode="numeric" id="baemin_basic" oninput="previewSessionInputs()"></label>
+          <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="baemin_promo" oninput="previewSessionInputs()"></label>
+          <label><span id="baemin_countLabel">누적 수행 건수</span><input class="time-inp" inputmode="numeric" id="baemin_count" oninput="previewSessionInputs()"></label>
           <label><span>거절 건수</span><input class="time-inp" inputmode="numeric" id="baemin_rejected" oninput="previewAcceptance()"></label>
         </div>
         <p class="record-tip" id="acceptancePreview" aria-live="polite">거절이 없으면 0을 입력하세요.</p>
@@ -292,9 +307,9 @@ body.running{background:#0a0d1a;}
         <fieldset>
           <legend>쿠팡</legend>
           <div class="entry-grid">
-            <label><span>기본 수입(원)</span><input class="time-inp" inputmode="numeric" id="coupang_basic"></label>
-            <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="coupang_promo"></label>
-            <label><span>건수</span><input class="time-inp" inputmode="numeric" id="coupang_count"></label>
+            <label><span id="coupang_basicLabel">누적 총액(원)</span><input class="time-inp" inputmode="numeric" id="coupang_basic" oninput="previewSessionInputs()"></label>
+            <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="coupang_promo" oninput="previewSessionInputs()"></label>
+            <label><span id="coupang_countLabel">누적 수행 건수</span><input class="time-inp" inputmode="numeric" id="coupang_count" oninput="previewSessionInputs()"></label>
           </div>
         </fieldset>
       </details>
@@ -815,6 +830,7 @@ function openEndModal() {
   resetBreakEdits();
   updateBreakSummary();
   document.getElementById('endOv').classList.add('show');
+  refreshWork();
 }
 
 function resetResultInputs(end) {
@@ -823,7 +839,7 @@ function resetResultInputs(end) {
   }
   document.getElementById('coupangInputs').open = false;
   document.getElementById('pointDate').value = inputDate(end);
-  previewAcceptance();
+  previewSessionInputs();
   loadPointBaseline();
 }
 
@@ -921,10 +937,89 @@ function readCountField(field) {
   return Number(input);
 }
 
+function previousWorkInputs() {
+  const date = workDateFromInput();
+  const start = timerState ? readEditedTime('start',new Date(timerState.startTime)) : null;
+  const lastEnd = Number.isFinite(+start) && start ? +start : Infinity;
+  const total = {baemin:{income:0,count:0},coupang:{income:0,count:0}};
+  for (const record of readWorkRecords()) {
+    if (record.date !== date || (timerState?.sessionId && record.sessionId === timerState.sessionId)) continue;
+    const endTime = String(record.endTime || '').padStart(5,'0');
+    const startTime = String(record.startTime || '').padStart(5,'0');
+    const dateIso = '20' + (record.endDate || record.startDate || record.date).replace(/\./g,'-');
+    const end = new Date(dateIso+'T'+endTime);
+    if (!record.endDate && endTime < startTime) end.setDate(end.getDate()+1);
+    if (!Number.isFinite(+end) || +end > lastEnd) continue;
+    for (const platform of ['baemin','coupang']) {
+      total[platform].income += (Number(record[platform+'_basic'])||0) + (Number(record[platform+'_promo'])||0);
+      total[platform].count += Number(record[platform+'_count'])||0;
+    }
+  }
+  return total;
+}
+
+function normalizedSessionPay(baseline = previousWorkInputs()) {
+  const pay = {};
+  for (const field of payFields) {
+    const input = readCountField(field);
+    if (input != null) pay[field] = input;
+  }
+  const dailyIncome = document.getElementById('incomeBasis').value === 'daily';
+  const dailyCount = document.getElementById('countBasis').value === 'daily';
+  for (const [platform,label] of [['baemin','배민'],['coupang','쿠팡']]) {
+    const basic = platform+'_basic', promo = platform+'_promo', count = platform+'_count';
+    if (dailyIncome) {
+      if (pay[basic] == null && pay[promo] > 0) throw new Error(label+' 프로모션을 입력하려면 누적 총액도 입력하세요.');
+      if (pay[basic] != null) {
+        pay[basic] -= baseline[platform].income + (pay[promo] || 0);
+        if (pay[basic] < 0) throw new Error(label+' 누적 총액이 이전 수입과 이번 프로모션 합계보다 작습니다.');
+      }
+    }
+    if (dailyCount && pay[count] != null) {
+      pay[count] -= baseline[platform].count;
+      if (pay[count] < 0) throw new Error(label+' 누적 건수가 이전 건수보다 작습니다.');
+    }
+  }
+  return pay;
+}
+
+function previewSessionInputs() {
+  const dailyIncome = document.getElementById('incomeBasis').value === 'daily';
+  const dailyCount = document.getElementById('countBasis').value === 'daily';
+  const prior = previousWorkInputs();
+  const el = document.getElementById('sessionInputPreview');
+  for (const platform of ['baemin','coupang']) {
+    document.getElementById(platform+'_basicLabel').textContent = dailyIncome ? '누적 총액(원)' : '기본 수입(원)';
+    document.getElementById(platform+'_countLabel').textContent = dailyCount ? '누적 수행 건수' : '이번 수행 건수';
+  }
+  try {
+    const pay = normalizedSessionPay(prior);
+    const parts = [];
+    for (const [platform,label] of [['baemin','배민'],['coupang','쿠팡']]) {
+      const paySet = pay[platform+'_basic'] != null || pay[platform+'_promo'] != null;
+      const count = pay[platform+'_count'];
+      if (platform==='coupang' && !paySet && count == null) continue;
+      const base = [];
+      if (dailyIncome) base.push(prior[platform].income.toLocaleString()+'원');
+      if (dailyCount) base.push(prior[platform].count.toLocaleString()+'건');
+      const current = [];
+      if (paySet) current.push(((pay[platform+'_basic']||0)+(pay[platform+'_promo']||0)).toLocaleString()+'원');
+      if (count != null) current.push(count.toLocaleString()+'건');
+      if (base.length || current.length) parts.push(label +
+        (base.length ? ' 이전 누적 '+base.join(' · ') : '') +
+        (current.length ? ' → 이번 세션 '+current.join(' · ') : ''));
+    }
+    el.textContent = parts.join(' / ');
+  } catch (err) {
+    el.textContent = err.message;
+  }
+  previewAcceptance();
+}
+
 function previewAcceptance() {
   const el = document.getElementById('acceptancePreview');
   try {
-    const performed = readCountField('baemin_count');
+    const performed = normalizedSessionPay().baemin_count;
     const rejected = readCountField('baemin_rejected');
     const rate = sessionAcceptance(performed,rejected);
     el.textContent = rate == null ? '거절이 없으면 0을 입력하세요.' :
@@ -935,11 +1030,7 @@ function previewAcceptance() {
 }
 
 function readManualResults() {
-  const pay = {};
-  for (const field of payFields) {
-    const input = readCountField(field);
-    if (input != null) pay[field] = input;
-  }
+  const pay = normalizedSessionPay();
   const rejected = readCountField('baemin_rejected');
   const acceptance = {};
   if (rejected != null) {
@@ -1282,6 +1373,7 @@ async function refreshWork() {
     status.textContent = '시트 연결 실패 · 기기에 저장된 기록 표시';
   } finally {
     loadingWork = false;
+    if (document.getElementById('endOv').classList.contains('show')) previewSessionInputs();
   }
 }
 </script>

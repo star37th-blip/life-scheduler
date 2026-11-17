@@ -307,7 +307,7 @@ body.running{background:#0a0d1a;}
           <label><span id="baemin_countLabel">누적 수행 건수</span><input class="time-inp" inputmode="numeric" id="baemin_count" oninput="previewSessionInputs()"></label>
           <label><span id="baemin_rejectedLabel">누적 거절 건수</span><input class="time-inp" inputmode="numeric" id="baemin_rejected" oninput="previewSessionInputs()"></label>
         </div>
-        <p class="record-tip" id="acceptancePreview" aria-live="polite">거절이 없으면 0을 입력하세요.</p>
+        <p class="record-tip" id="acceptancePreview" aria-live="polite">오늘 누적 거절을 입력하세요. 마지막 입력값을 근무일 합계로 씁니다.</p>
       </fieldset>
       <details id="coupangInputs">
         <summary>쿠팡 실적 입력</summary>
@@ -395,7 +395,7 @@ body.running{background:#0a0d1a;}
         <span class="result-val" id="res-points">--</span>
       </div>
       <div class="result-row">
-        <span class="result-key">배민 세션 추정 수락률</span>
+        <span class="result-key" id="res-acceptance-label">배민 세션 추정 수락률</span>
         <span class="result-val" id="res-acceptance">—</span>
       </div>
       <div class="result-row">
@@ -601,7 +601,8 @@ function renderPointRound() {
 function renderAcceptanceForecast() {
   const forecast = pointRound?.acceptanceForecast;
   const pending = readWorkRecords().some(record =>
-    record.pending && Number.isFinite(record.baemin_count) && Number.isFinite(record.baemin_rejected));
+    record.pending && (Number.isFinite(record.baemin_daily_rejected) ||
+      (Number.isFinite(record.baemin_count) && Number.isFinite(record.baemin_rejected))));
   const rate = forecast?.rate;
   const label = ['2주 예상 누적 수락률'];
   if (pending) label.push('전송 대기 포함 전');
@@ -962,7 +963,7 @@ function previousWorkInputs() {
   const date = workDateFromInput();
   const start = timerState ? readEditedTime('start',new Date(timerState.startTime)) : null;
   const lastEnd = Number.isFinite(+start) && start ? +start : Infinity;
-  const total = {baemin:{income:0,basic:0,count:0,rejected:0,missingRejected:0},coupang:{income:0,basic:0,count:0}};
+  const total = {baemin:{income:0,basic:0,count:0},coupang:{income:0,basic:0,count:0}};
   for (const record of readWorkRecords()) {
     if (record.date !== date || (timerState?.sessionId && record.sessionId === timerState.sessionId)) continue;
     const endTime = String(record.endTime || '').padStart(5,'0');
@@ -977,13 +978,7 @@ function previousWorkInputs() {
       total[platform].income += basic + (Number(record[platform+'_promo'])||0);
       total[platform].count += Number(record[platform+'_count'])||0;
     }
-    const rejected = record.baemin_rejected;
-    if (rejected != null && rejected !== '' && Number.isSafeInteger(Number(rejected)) && Number(rejected) >= 0) {
-      total.baemin.rejected += Number(rejected);
-    } else if (Number(record.baemin_count) > 0 || Number(record.baemin_basic) > 0 ||
-        Number(record.baemin_promo) > 0 || record.awaitingResults) {
-      total.baemin.missingRejected++;
-    }
+
   }
   return total;
 }
@@ -1019,16 +1014,6 @@ function normalizedSessionPay(baseline = previousWorkInputs()) {
   return pay;
 }
 
-function normalizedRejection(previous = previousWorkInputs().baemin) {
-  const value = readCountField('baemin_rejected');
-  if (value == null || document.getElementById('rejectionBasis').value !== 'daily') return value;
-  if (previous.missingRejected) {
-    throw new Error('앞선 세션에 거절 기록이 비어 있습니다. 이번 세션 거절만 알고 있다면 입력 기준을 ‘이번 세션만’으로 바꾸세요.');
-  }
-  if (value < previous.rejected) throw new Error('누적 거절 건수가 이전 거절 건수보다 작습니다.');
-  return value-previous.rejected;
-}
-
 function previewSessionInputs() {
   const incomeBasis = document.getElementById('incomeBasis').value;
   const dailyIncome = incomeBasis === 'daily';
@@ -1044,7 +1029,7 @@ function previewSessionInputs() {
   }
   try {
     const pay = normalizedSessionPay(prior);
-    const rejected = normalizedRejection(prior.baemin);
+    const rejected = readCountField('baemin_rejected');
     const parts = [];
     for (const [platform,label] of [['baemin','배민'],['coupang','쿠팡']]) {
       const paySet = pay[platform+'_basic'] != null || pay[platform+'_promo'] != null;
@@ -1053,15 +1038,15 @@ function previewSessionInputs() {
       const base = [];
       if (dailyIncome || dailyBasic) base.push((dailyIncome ? prior[platform].income : prior[platform].basic).toLocaleString()+'원');
       if (dailyCount) base.push('수행 '+prior[platform].count.toLocaleString()+'건');
-      if (platform==='baemin' && dailyReject) base.push(prior.baemin.missingRejected ? '거절 미확인' : '거절 '+prior.baemin.rejected+'건');
       const current = [];
       if (paySet) current.push(((pay[platform+'_basic']||0)+(pay[platform+'_promo']||0)).toLocaleString()+'원');
       if (count != null) current.push('수행 '+count.toLocaleString()+'건');
-      if (platform==='baemin' && rejected != null) current.push('거절 '+rejected+'건');
+      if (platform==='baemin' && rejected != null && !dailyReject) current.push('거절 '+rejected+'건');
       if (base.length || current.length) parts.push(label +
         (base.length ? ' 이전 누적 '+base.join(' · ') : '') +
         (current.length ? ' → 이번 세션 '+current.join(' · ') : ''));
     }
+    if (dailyReject && rejected != null) parts.push('근무일 누적 거절 '+rejected+'건');
     el.textContent = parts.join(' / ');
   } catch (err) {
     el.textContent = err.message;
@@ -1072,11 +1057,14 @@ function previewSessionInputs() {
 function previewAcceptance() {
   const el = document.getElementById('acceptancePreview');
   try {
-    const performed = normalizedSessionPay().baemin_count;
-    const rejected = normalizedRejection();
+    const prior = previousWorkInputs();
+    const count = normalizedSessionPay(prior).baemin_count;
+    const rejected = readCountField('baemin_rejected');
+    const daily = document.getElementById('rejectionBasis').value === 'daily';
+    const performed = daily ? prior.baemin.count + (count || 0) : count;
     const rate = sessionAcceptance(performed,rejected);
-    el.textContent = rate == null ? '거절이 없으면 0을 입력하세요.' :
-      '이번 세션 추정 수락률 ' + formatRate(rate) + ' · 수행 ' + performed + '건 / 거절 ' + rejected + '건';
+    el.textContent = rate == null ? (daily ? '마지막 누적 거절이 근무일 합계가 됩니다.' : '이번 세션의 수행·거절을 입력하세요.') :
+      (daily ? '근무일' : '이번 세션') + ' 추정 수락률 ' + formatRate(rate) + ' · 수행 ' + performed + '건 / 거절 ' + rejected + '건';
   } catch (err) {
     el.textContent = err.message;
   }
@@ -1084,14 +1072,18 @@ function previewAcceptance() {
 
 function readManualResults() {
   const pay = normalizedSessionPay();
-  const rejected = normalizedRejection();
+  const rejected = readCountField('baemin_rejected');
   const acceptance = {};
   if (rejected != null) {
-    if (pay.baemin_count == null) throw new Error('거절 건수를 기록할 때는 배민 수행 건수도 입력하세요.');
-    const pointDate = document.getElementById('pointDate').value;
-    if (!pointDate) throw new Error('평가 산정일을 선택하세요.');
-    acceptance.baemin_rejected = rejected;
-    acceptance.pointDate = pointDate;
+    if (document.getElementById('rejectionBasis').value === 'daily') {
+      acceptance.baemin_daily_rejected = rejected;
+    } else {
+      if (pay.baemin_count == null) throw new Error('거절 건수를 기록할 때는 배민 수행 건수도 입력하세요.');
+      const pointDate = document.getElementById('pointDate').value;
+      if (!pointDate) throw new Error('평가 산정일을 선택하세요.');
+      acceptance.baemin_rejected = rejected;
+      acceptance.pointDate = pointDate;
+    }
   }
   const money = payFields.filter(field => !field.endsWith('_count'));
   const counts = payFields.filter(field => field.endsWith('_count'));
@@ -1099,7 +1091,7 @@ function readManualResults() {
     ? fields.reduce((sum,field) => sum + (pay[field] || 0),0) : null;
   const points = readPointInputs();
   return {...pay,...points,...acceptance,totalPay:total(money),totalCount:total(counts),
-    awaitingResults:!Object.keys(pay).length && points.points == null};
+    awaitingResults:!Object.keys(pay).length && points.points == null && rejected == null};
 }
 
 function workDateFromInput() {
@@ -1278,7 +1270,8 @@ async function syncWorkRecords() {
       status.textContent = '시트 전송 중 · ' + (pending.length + closes.length) + '건';
       for (const {pending: ignored, ...record} of pending) {
         const hasManualResults = payFields.some(field => record[field] != null) || record.pointCumulative != null;
-        const action = record.baemin_rejected != null ? 'saveWorkSessionV5' :
+        const action = record.baemin_daily_rejected != null ? 'saveWorkSessionV6' :
+          record.baemin_rejected != null ? 'saveWorkSessionV5' :
           hasManualResults ? 'saveWorkSessionV4' : 'saveWorkSessionV3';
         const result = await workRequest({action, ...record});
         if (!result.saved || result.sessionId !== record.sessionId) {
@@ -1295,7 +1288,7 @@ async function syncWorkRecords() {
         if (!saveWorkDay({...workDay, pendingCloses})) throw new Error('기기 상태 저장 실패');
       }
       status.textContent = '시트 저장 완료';
-      if (pending.some(record => Number.isFinite(record.pointCumulative) || Number.isFinite(record.baemin_count))) refreshPointRound();
+      if (pending.some(record => Number.isFinite(record.pointCumulative) || Number.isFinite(record.baemin_count) || Number.isFinite(record.baemin_daily_rejected))) refreshPointRound();
     } while (syncRequested);
   } catch (err) {
     const count = readWorkRecords().filter(record => record.pending).length + (workDay.pendingCloses || []).length;
@@ -1323,9 +1316,13 @@ function showResult(rec){
   document.getElementById('res-coupang').textContent=cTotal>0?cTotal.toLocaleString()+'원':'-';
   document.getElementById('res-total').textContent=rec.totalPay == null || rec.totalPay === '' ? '실적 입력 대기' : total.toLocaleString()+'원';
   document.getElementById('res-points').textContent=rec.points == null || rec.points === '' ? '—' : Number(rec.points).toLocaleString()+'P';
+  const dailyRejected = rec.baemin_daily_rejected;
+  const stored = document.getElementById('res-acceptance');
+  document.getElementById('res-acceptance-label').textContent = dailyRejected != null ?
+    '근무일 누적 거절' : '배민 세션 추정 수락률';
   const acceptance = sessionAcceptance(rec.baemin_count,rec.baemin_rejected);
-  document.getElementById('res-acceptance').textContent = acceptance == null ? '—' :
-    formatRate(acceptance) + ' · 수행 ' + rec.baemin_count + ' / 거절 ' + rec.baemin_rejected;
+  stored.textContent = dailyRejected != null ? dailyRejected.toLocaleString() + '건' :
+    acceptance == null ? '—' : formatRate(acceptance) + ' · 수행 ' + rec.baemin_count + ' / 거절 ' + rec.baemin_rejected;
   renderAcceptanceForecast();
   document.getElementById('res-per-count').textContent=perCount>0?perCount.toLocaleString()+'원':'-';
   document.getElementById('res-per-hour').textContent=perHour>0?perHour.toLocaleString()+'원':'-';

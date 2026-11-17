@@ -515,6 +515,20 @@ function mergeWorkRecords(records) {
     b.startTime.localeCompare(a.startTime));
 }
 
+function reconcileWorkRecords(local, remote, days, now = new Date()) {
+  const serverIds = new Set(remote.map(record => record.sessionId).filter(Boolean));
+  const cutoff = new Date(now);
+  cutoff.setDate(cutoff.getDate()-days+1);
+  const firstDate = fmtDate(cutoff);
+  const retained = local.filter(record => {
+    // Keep unsent drafts and records outside the server query.
+    const canRemove = record.sessionId && record.pending === false && record.awaitingResults &&
+      record.date >= firstDate;
+    return !canRemove || serverIds.has(record.sessionId);
+  });
+  return mergeWorkRecords([...retained, ...remote]);
+}
+
 function readWorkRecords() {
   return JSON.parse(localStorage.getItem('work_recs') || '[]');
 }
@@ -1402,10 +1416,11 @@ async function refreshWork() {
   const status = document.getElementById('status-work');
   try {
     status.textContent = '시트 불러오는 중…';
-    const data = await workRequest({action:'loadWorkSessions', days:31});
+    const days = 31;
+    const data = await workRequest({action:'loadWorkSessions', days});
     if (!Array.isArray(data.records)) throw new Error('Invalid records');
     const remote = data.records.map(record => ({...record, pending:false}));
-    storeWorkRecords([...readWorkRecords(), ...remote]);
+    storeWorkRecords(reconcileWorkRecords(readWorkRecords(),remote,days));
     renderWork();
     status.textContent = '시트 기록을 불러왔습니다';
   } catch (err) {

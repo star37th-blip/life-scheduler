@@ -201,7 +201,7 @@ body.running{background:#0a0d1a;}
     <span id="statRoundLabel">배민 2주 누적</span><strong id="statRoundPoints">—</strong>
   </div>
   <div class="round-stat">
-    <span id="statOfficialRateLabel">2주 확정 수락률 · 배민 09시</span><strong id="statOfficialRate">—</strong>
+    <span id="statOfficialRateLabel">2주 확정 수락률 · 배민 앱</span><strong id="statOfficialRate">—</strong>
   </div>
   <div class="round-stat">
     <span id="statAcceptanceLabel">2주 추정 수락률</span><strong id="statAcceptance">—</strong>
@@ -536,8 +536,8 @@ function renderPointRound() {
   const count = acceptance?.sessions || 0;
   const verified = pointRound?.officialAcceptance;
   const officialLabel = ['2주 확정 수락률'];
-  if (verified?.publishedDate) officialLabel.push(verified.publishedDate.slice(5).replace('-', '/') + ' 09시');
-  else officialLabel.push('배민 09시');
+  if (verified?.publishedDate) officialLabel.push(verified.publishedDate.slice(5).replace('-', '/') + ' 확인');
+  else officialLabel.push('배민 앱');
   if (Number.isFinite(target)) officialLabel.push('목표 ' + formatRate(target));
   document.getElementById('statOfficialRateLabel').textContent = officialLabel.join(' · ');
   document.getElementById('statOfficialRate').textContent = Number.isFinite(verified?.rate) ? formatRate(verified.rate) : '—';

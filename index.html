@@ -184,12 +184,12 @@ body.running{background:#0a0d1a;}
   <h1 class="summary-date" id="statWorkDayLabel">근무일 누적</h1>
   <div class="stat-grid">
     <div class="stat-card">
-      <div class="s-label">누적 수입</div>
+      <div class="s-label">근무일 수입</div>
       <div class="s-val" id="statToday">—</div>
       <div class="s-sub" id="statGoalSub"></div>
     </div>
     <div class="stat-card">
-      <div class="s-label">누적 포인트</div>
+      <div class="s-label">근무일 포인트</div>
       <div class="s-val" id="statDayPoints">—</div>
       <div class="s-sub" id="statTodaySub"></div>
     </div>
@@ -198,7 +198,7 @@ body.running{background:#0a0d1a;}
     <span id="statWorkTime">근무 0분</span><span id="statWorkCount">배달 0건</span>
   </div>
   <div class="round-stat">
-    <span id="statRoundLabel">배민 회차 누적</span><strong id="statRoundPoints">—</strong>
+    <span id="statRoundLabel">배민 2주 누적</span><strong id="statRoundPoints">—</strong>
   </div>
 </section>
 
@@ -517,12 +517,12 @@ function renderPointRound() {
   const label = document.getElementById('statRoundLabel');
   const value = document.getElementById('statRoundPoints');
   if (!pointRound) {
-    label.textContent = '배민 회차 누적';
+    label.textContent = '배민 2주 누적';
     value.textContent = '—';
     return;
   }
   const shortDate = date => date.slice(5).replace('-', '/');
-  label.textContent = '배민 회차 누적 · ' + shortDate(pointRound.roundStart) + '–' + shortDate(pointRound.roundEnd);
+  label.textContent = '배민 2주 누적 · ' + shortDate(pointRound.roundStart) + '–' + shortDate(pointRound.roundEnd);
   value.textContent = formatPoints(pointRound.baseline);
 }
 

@@ -200,6 +200,12 @@ body.running{background:#0a0d1a;}
   <div class="round-stat">
     <span id="statRoundLabel">배민 2주 누적</span><strong id="statRoundPoints">—</strong>
   </div>
+  <div class="round-stat">
+    <span id="statOfficialRateLabel">2주 확정 수락률 · 배민 09시</span><strong id="statOfficialRate">—</strong>
+  </div>
+  <div class="round-stat">
+    <span id="statAcceptanceLabel">2주 추정 수락률</span><strong id="statAcceptance">—</strong>
+  </div>
 </section>
 
 <div class="work-day">
@@ -268,8 +274,10 @@ body.running{background:#0a0d1a;}
         <div class="entry-grid">
           <label><span>기본 수입(원)</span><input class="time-inp" inputmode="numeric" id="baemin_basic"></label>
           <label><span>프로모션(원)</span><input class="time-inp" inputmode="numeric" id="baemin_promo"></label>
-          <label><span>건수</span><input class="time-inp" inputmode="numeric" id="baemin_count"></label>
+          <label><span>수행 건수</span><input class="time-inp" inputmode="numeric" id="baemin_count" oninput="previewAcceptance()"></label>
+          <label><span>거절 건수</span><input class="time-inp" inputmode="numeric" id="baemin_rejected" oninput="previewAcceptance()"></label>
         </div>
+        <p class="record-tip" id="acceptancePreview" aria-live="polite">거절이 없으면 0을 입력하세요.</p>
       </fieldset>
       <details id="coupangInputs">
         <summary>쿠팡 실적 입력</summary>
@@ -287,12 +295,14 @@ body.running{background:#0a0d1a;}
         <div class="point-grid">
           <label><span>세션 전 누적(P)</span><input class="time-inp" inputmode="decimal" id="previousCumulative" oninput="editPointBaseline()"></label>
           <label><span>세션 종료 누적(P)</span><input class="time-inp" inputmode="decimal" id="pointCumulative" oninput="previewPoints()"></label>
-          <label><span>포인트 산정일</span><input class="time-inp" type="date" id="pointDate" onchange="loadPointBaseline()"></label>
         </div>
         <p class="record-tip" id="pointBaselineStatus" role="status"></p>
         <p class="record-tip" id="pointPreview" aria-live="polite">같은 회차의 시작 전·종료 누적을 입력하세요.</p>
       </fieldset>
     </div>
+    <label class="break-field">평가 산정일 (배민 포인트·수락률)
+      <input class="time-inp" type="date" id="pointDate" onchange="loadPointBaseline()">
+    </label>
     <div id="recordError" role="status"></div>
     <div class="btn-row">
       <button class="sbtn sec" onclick="cancelEnd()">계속</button>
@@ -353,6 +363,10 @@ body.running{background:#0a0d1a;}
       <div class="result-row">
         <span class="result-key">이번 세션 포인트</span>
         <span class="result-val" id="res-points">--</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">배민 세션 추정 수락률</span>
+        <span class="result-val" id="res-acceptance">—</span>
       </div>
       <div class="result-row">
         <span class="result-key">건당</span>
@@ -516,6 +530,21 @@ function formatPoints(points) {
 function renderPointRound() {
   const label = document.getElementById('statRoundLabel');
   const value = document.getElementById('statRoundPoints');
+  const acceptance = pointRound?.acceptance;
+  const target = acceptance?.target;
+  const rate = acceptance?.rate;
+  const count = acceptance?.sessions || 0;
+  const verified = pointRound?.officialAcceptance;
+  const officialLabel = ['2주 확정 수락률'];
+  if (verified?.publishedDate) officialLabel.push(verified.publishedDate.slice(5).replace('-', '/') + ' 09시');
+  else officialLabel.push('배민 09시');
+  if (Number.isFinite(target)) officialLabel.push('목표 ' + formatRate(target));
+  document.getElementById('statOfficialRateLabel').textContent = officialLabel.join(' · ');
+  document.getElementById('statOfficialRate').textContent = Number.isFinite(verified?.rate) ? formatRate(verified.rate) : '—';
+  const note = ['2주 추정 수락률'];
+  if (count) note.push(count + '세션 기록 기준');
+  document.getElementById('statAcceptanceLabel').textContent = note.join(' · ');
+  document.getElementById('statAcceptance').textContent = Number.isFinite(rate) ? formatRate(rate) : '—';
   if (!pointRound) {
     label.textContent = '배민 2주 누적';
     value.textContent = '—';
@@ -523,7 +552,7 @@ function renderPointRound() {
   }
   const shortDate = date => date.slice(5).replace('-', '/');
   label.textContent = '배민 2주 누적 · ' + shortDate(pointRound.roundStart) + '–' + shortDate(pointRound.roundEnd);
-  value.textContent = formatPoints(pointRound.baseline);
+  value.textContent = Number.isFinite(pointRound.baseline) ? formatPoints(pointRound.baseline) : '—';
 }
 
 async function refreshPointRound() {
@@ -535,7 +564,7 @@ async function refreshPointRound() {
       action:'loadDeliveryPointBaseline',pointDate:date,startDate:date,startTime:fmtTime(now)
     });
     if (request !== pointRoundRequest) return;
-    pointRound = Number.isFinite(info.baseline) && info.roundStart && info.roundEnd ? info : null;
+    pointRound = info.roundStart && info.roundEnd ? info : null;
     renderPointRound();
   } catch {
     if (request !== pointRoundRequest) return;
@@ -749,11 +778,12 @@ function openEndModal() {
 }
 
 function resetResultInputs(end) {
-  for (const field of [...payFields,'previousCumulative','pointCumulative']) {
+  for (const field of [...payFields,'baemin_rejected','previousCumulative','pointCumulative']) {
     document.getElementById(field).value = '';
   }
   document.getElementById('coupangInputs').open = false;
   document.getElementById('pointDate').value = inputDate(end);
+  previewAcceptance();
   loadPointBaseline();
 }
 
@@ -832,22 +862,59 @@ function previewPoints() {
   }
 }
 
+function formatRate(rate) {
+  return rate.toLocaleString('ko-KR',{style:'percent',maximumFractionDigits:1});
+}
+
+function sessionAcceptance(performed,rejected) {
+  if (!Number.isSafeInteger(performed) || performed < 0 ||
+      !Number.isSafeInteger(rejected) || rejected < 0 || performed + rejected === 0) return null;
+  return performed/(performed+rejected);
+}
+
+function readCountField(field) {
+  const input = document.getElementById(field).value.trim().replace(/,/g,'');
+  if (!input) return null;
+  if (!/^\d+$/.test(input) || !Number.isSafeInteger(Number(input))) {
+    throw new Error('금액과 건수는 0 이상의 정수로 입력하세요.');
+  }
+  return Number(input);
+}
+
+function previewAcceptance() {
+  const el = document.getElementById('acceptancePreview');
+  try {
+    const performed = readCountField('baemin_count');
+    const rejected = readCountField('baemin_rejected');
+    const rate = sessionAcceptance(performed,rejected);
+    el.textContent = rate == null ? '거절이 없으면 0을 입력하세요.' :
+      '이번 세션 추정 수락률 ' + formatRate(rate) + ' · 수행 ' + performed + '건 / 거절 ' + rejected + '건';
+  } catch (err) {
+    el.textContent = err.message;
+  }
+}
+
 function readManualResults() {
   const pay = {};
   for (const field of payFields) {
-    const input = document.getElementById(field).value.trim().replace(/,/g,'');
-    if (!input) continue;
-    if (!/^\d+$/.test(input) || !Number.isSafeInteger(Number(input))) {
-      throw new Error('금액과 건수는 0 이상의 정수로 입력하세요.');
-    }
-    pay[field] = Number(input);
+    const input = readCountField(field);
+    if (input != null) pay[field] = input;
+  }
+  const rejected = readCountField('baemin_rejected');
+  const acceptance = {};
+  if (rejected != null) {
+    if (pay.baemin_count == null) throw new Error('거절 건수를 기록할 때는 배민 수행 건수도 입력하세요.');
+    const pointDate = document.getElementById('pointDate').value;
+    if (!pointDate) throw new Error('평가 산정일을 선택하세요.');
+    acceptance.baemin_rejected = rejected;
+    acceptance.pointDate = pointDate;
   }
   const money = payFields.filter(field => !field.endsWith('_count'));
   const counts = payFields.filter(field => field.endsWith('_count'));
   const total = fields => fields.some(field => field in pay)
     ? fields.reduce((sum,field) => sum + (pay[field] || 0),0) : null;
   const points = readPointInputs();
-  return {...pay,...points,totalPay:total(money),totalCount:total(counts),
+  return {...pay,...points,...acceptance,totalPay:total(money),totalCount:total(counts),
     awaitingResults:!Object.keys(pay).length && points.points == null};
 }
 
@@ -1027,7 +1094,8 @@ async function syncWorkRecords() {
       status.textContent = '시트 전송 중 · ' + (pending.length + closes.length) + '건';
       for (const {pending: ignored, ...record} of pending) {
         const hasManualResults = payFields.some(field => record[field] != null) || record.pointCumulative != null;
-        const action = hasManualResults ? 'saveWorkSessionV4' : 'saveWorkSessionV3';
+        const action = record.baemin_rejected != null ? 'saveWorkSessionV5' :
+          hasManualResults ? 'saveWorkSessionV4' : 'saveWorkSessionV3';
         const result = await workRequest({action, ...record});
         if (!result.saved || result.sessionId !== record.sessionId) {
           throw new Error('저장 확인 실패');
@@ -1043,7 +1111,7 @@ async function syncWorkRecords() {
         if (!saveWorkDay({...workDay, pendingCloses})) throw new Error('기기 상태 저장 실패');
       }
       status.textContent = '시트 저장 완료';
-      if (pending.some(record => Number.isFinite(record.pointCumulative))) refreshPointRound();
+      if (pending.some(record => Number.isFinite(record.pointCumulative) || Number.isFinite(record.baemin_rejected))) refreshPointRound();
     } while (syncRequested);
   } catch (err) {
     const count = readWorkRecords().filter(record => record.pending).length + (workDay.pendingCloses || []).length;
@@ -1071,6 +1139,9 @@ function showResult(rec){
   document.getElementById('res-coupang').textContent=cTotal>0?cTotal.toLocaleString()+'원':'-';
   document.getElementById('res-total').textContent=rec.totalPay == null || rec.totalPay === '' ? '실적 입력 대기' : total.toLocaleString()+'원';
   document.getElementById('res-points').textContent=rec.points == null || rec.points === '' ? '—' : Number(rec.points).toLocaleString()+'P';
+  const acceptance = sessionAcceptance(rec.baemin_count,rec.baemin_rejected);
+  document.getElementById('res-acceptance').textContent = acceptance == null ? '—' :
+    formatRate(acceptance) + ' · 수행 ' + rec.baemin_count + ' / 거절 ' + rec.baemin_rejected;
   document.getElementById('res-per-count').textContent=perCount>0?perCount.toLocaleString()+'원':'-';
   document.getElementById('res-per-hour').textContent=perHour>0?perHour.toLocaleString()+'원':'-';
 

@@ -21,6 +21,31 @@ body{
   transition:background .5s ease;
 }
 body.running{background:#0a0d1a;}
+[hidden]{display:none!important;}
+.app-nav,.work-view,.round-view{width:100%;max-width:540px;align-self:center;}
+.app-nav,.round-options{display:flex;flex-shrink:0;gap:6px;padding:8px 16px;border-bottom:1px solid var(--bd);}
+.app-nav button,.round-options button,.round-refresh{
+  flex:1;min-height:40px;padding:4px 8px;border:1px solid var(--bd2);border-radius:8px;
+  background:var(--sf2);color:#d4d4d8;font:700 14px var(--font);cursor:pointer;
+}
+.app-nav button[aria-pressed="true"],.round-options button[aria-pressed="true"]{color:#bfdbfe;border-color:var(--work);background:#172033;}
+.app-nav button:focus-visible,.round-options button:focus-visible,.round-refresh:focus-visible{outline:2px solid #e0f2fe;outline-offset:2px;}
+.work-view{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;}
+.work-view .bottom{min-height:110px;}
+.round-view{min-height:0;flex:1;overflow:auto;}
+.round-content{padding:16px;display:grid;gap:12px;}
+.round-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.round-heading h1{font-size:18px;}
+.round-refresh{flex:none;}
+.round-note{font-size:13px;color:#b4bac4;line-height:1.5;}
+.round-card{padding:12px;border:1px solid var(--bd2);border-radius:8px;background:var(--sf2);}
+.round-card h2{font-size:15px;margin-bottom:4px;}
+.round-card .round-stat{padding:9px 0;}
+.round-card progress{display:block;width:100%;height:10px;margin:10px 0;accent-color:var(--work);}
+.round-table{width:100%;border-collapse:collapse;font-size:12px;text-align:right;}
+.round-table th,.round-table td{padding:9px 3px;border-bottom:1px solid var(--bd2);}
+.round-table th:first-child{text-align:left;}
+.round-table tbody td{font-variant-numeric:tabular-nums;white-space:nowrap;}
 /* ── 타이머와 누적 실적 ── */
 .session-control,.topbar,.work-day,.bottom,#sheetSyncStatus{width:100%;max-width:540px;align-self:center;}
 .session-control{
@@ -172,6 +197,11 @@ body.running{background:#0a0d1a;}
 </head>
 <body>
 
+<nav class="app-nav" aria-label="앱 화면">
+  <button type="button" aria-pressed="true" aria-controls="workView" onclick="showAppView('work')">근무</button>
+  <button type="button" aria-pressed="false" aria-controls="roundView" onclick="showAppView('round')">2주 현황</button>
+</nav>
+
 <div class="session-control">
   <div>
     <span class="timer-caption" id="timerCaption">대기 중</span>
@@ -183,6 +213,7 @@ body.running{background:#0a0d1a;}
   </div>
 </div>
 
+<div class="work-view" id="workView">
 <section class="topbar" aria-labelledby="statWorkDayLabel">
   <h1 class="summary-date" id="statWorkDayLabel">근무일 누적</h1>
   <div class="stat-grid">
@@ -237,6 +268,23 @@ body.running{background:#0a0d1a;}
       <div class="sync-st" id="status-work"></div>
       <div id="list-work"><div class="empty">기록 없음</div></div>
 </div>
+</div>
+
+<section class="round-view" id="roundView" aria-label="2주 현황" hidden>
+  <div class="round-options" role="group" aria-label="평가 회차 보기">
+    <button type="button" data-period="current" aria-pressed="true">진행 중</button>
+    <button type="button" data-period="previous" aria-pressed="false">직전 2주</button>
+    <button type="button" data-period="compare" aria-pressed="false">비교</button>
+  </div>
+  <div class="round-content">
+    <div class="round-heading">
+      <h1 id="roundHeading">진행 중</h1>
+      <button type="button" class="round-refresh" onclick="refreshWork()">새로고침</button>
+    </div>
+    <p class="round-note" id="roundStatus" role="status"></p>
+    <div id="roundDetails" class="round-content" style="padding:0"></div>
+  </div>
+</section>
 
 <!-- 종료 모달 -->
 <div class="ov" id="endOv">
@@ -463,11 +511,18 @@ body.running{background:#0a0d1a;}
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyd1KSpAxzkce_4MnQenji5fqarR6nxysjzZS4eZTCA7FClppLGJ96HQgdbkXwQbWVQ/exec';
 const DAILY_GOAL_DEFAULT = 150000; // 목표탭에서 계산 전 기본값
+const ROUND_ANCHOR = '2026-11-16';
+const ROUND_POINT_GOAL = 7000;
 
 let timerState = JSON.parse(localStorage.getItem('ts2') || 'null');
 let timerInterval = null;
 let pointRound = null;
 let pointRoundRequest = 0;
+let roundRecords = null;
+let roundRecordChanges = [];
+let roundRecordStatus = '';
+let displayedRoundDate = '';
+let roundMode = 'current';
 let stoppedAt;
 let workDay = JSON.parse(localStorage.getItem('delivery_work_day') || '{}');
 let syncingWork = false;
@@ -576,6 +631,7 @@ function formatPoints(points) {
 }
 
 function renderPointRound() {
+  if (!document.getElementById('roundView').hidden) renderRoundView();
   const label = document.getElementById('statRoundLabel');
   const value = document.getElementById('statRoundPoints');
   const acceptance = pointRound?.acceptance;
@@ -1279,6 +1335,9 @@ async function syncWorkRecords() {
         }
         storeWorkRecords(readWorkRecords().map(current =>
           current.sessionId === record.sessionId ? {...current, pending:false} : current));
+        const confirmed = {...record,pending:false};
+        if (loadingWork) roundRecordChanges.push(confirmed);
+        if (roundRecords) roundRecords = mergeWorkRecords([...roundRecords,confirmed]);
         renderWork();
       }
       for (const close of closes) {
@@ -1362,6 +1421,179 @@ function closeResult(){document.getElementById('resultOv').classList.remove('sho
 let currentPeriod = 7;
 let loadingWork = false;
 
+function showAppView(view) {
+  const showRound = view === 'round';
+  document.getElementById('workView').hidden = showRound;
+  document.getElementById('roundView').hidden = !showRound;
+  document.querySelectorAll('.app-nav button').forEach(button => {
+    button.setAttribute('aria-pressed', String(button.getAttribute('aria-controls') === view + 'View'));
+  });
+  if (!showRound) return;
+  renderRoundView();
+  if (displayedRoundDate !== inputDate(new Date()) || !roundRecords) refreshWork();
+}
+
+document.querySelectorAll('.round-options button').forEach(button => {
+  button.addEventListener('click', () => {
+    roundMode = button.dataset.period;
+    document.querySelectorAll('.round-options button').forEach(option => {
+      option.setAttribute('aria-pressed', String(option === button));
+    });
+    renderRoundView();
+  });
+});
+
+function shiftDate(date, days) {
+  const value = new Date(date + 'T00:00:00Z');
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0,10);
+}
+
+function daysBetween(start, end) {
+  return (Date.parse(end + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000;
+}
+
+function sessionIsoDate(date) {
+  return /^\d{2}\.\d{2}\.\d{2}$/.test(date) ? '20' + date.replace(/\./g,'-') : date;
+}
+
+function roundBounds(today, settings) {
+  const offset = Math.floor(daysBetween(ROUND_ANCHOR,today) / 14) * 14;
+  const sheetRound = settings && settings.roundStart <= today && today <= settings.roundEnd;
+  const start = sheetRound ? settings.roundStart : shiftDate(ROUND_ANCHOR,offset);
+  const end = sheetRound ? settings.roundEnd : shiftDate(start,13);
+  const previousStart = shiftDate(start,-14);
+  return {
+    start,end,previousStart,previousEnd:shiftDate(start,-1),
+    comparisonEnd:shiftDate(previousStart,Math.min(13,daysBetween(start,today))),
+    settings:sheetRound ? settings : null
+  };
+}
+
+function summarizeRound(records, start, end, baeminOnly = false) {
+  const totals = {sessions:0,minutes:0,base:0,promo:0,count:0,points:null};
+  for (const record of records) {
+    if (record.pending || record.awaitingResults) continue;
+    const num = key => Number(record[key]) || 0;
+    const date = sessionIsoDate(record.date);
+    const credited = sessionIsoDate(record.pointDate);
+    if (credited >= start && credited <= end && Number.isFinite(record.points)) {
+      totals.points = (totals.points ?? 0) + record.points;
+    }
+    if (date < start || date > end) continue;
+    const baemin = num('baemin_count') || num('baemin_basic') || num('baemin_promo');
+    if (baeminOnly && !baemin) continue;
+    const minutes = workMinutes(record);
+    const base = num('baemin_basic') + (baeminOnly ? 0 : num('coupang_basic'));
+    const promo = num('baemin_promo') + (baeminOnly ? 0 : num('coupang_promo'));
+    const count = num('baemin_count') + (baeminOnly ? 0 : num('coupang_count'));
+    if (!minutes && !base && !promo && !count) continue;
+    totals.sessions++;
+    totals.minutes += minutes;
+    totals.base += base;
+    totals.promo += promo;
+    totals.count += count;
+  }
+  return totals;
+}
+
+const roundNumber = (value, digits = 0) => value.toLocaleString('ko-KR',{maximumFractionDigits:digits});
+const roundMoney = value => roundNumber(value) + '원';
+const roundDuration = value => Math.floor(value/60) + '시간 ' + (value%60) + '분';
+const roundDates = (start, end) => start.slice(5).replace('-', '/') + '–' + end.slice(5).replace('-', '/');
+
+function roundStats(title, rows) {
+  return '<section class="round-card"><h2>' + title + '</h2>' + rows.map(([label,value]) =>
+    '<div class="round-stat"><span>' + label + '</span><strong>' + value + '</strong></div>'
+  ).join('') + '</section>';
+}
+
+function roundComparison(previous, current) {
+  const metrics = [
+    ['프로모션 제외 시급', data => data.minutes ? data.base * 60 / data.minutes : null, '원'],
+    ['프로모션 제외 건당', data => data.count ? data.base / data.count : null, '원'],
+    ['시간당 완료 건수', data => data.minutes ? data.count * 60 / data.minutes : null, '건', 1],
+    ['순근무시간', data => data.sessions ? data.minutes : null, '', 0, roundDuration],
+    ['완료 건수', data => data.sessions ? data.count : null, '건']
+  ];
+  return '<section class="round-card"><table class="round-table">' +
+    '<thead><tr><th scope="col">배민</th><th scope="col">직전</th><th scope="col">진행 중</th><th scope="col">변화</th></tr></thead><tbody>' +
+    metrics.map(([label, metric, unit, digits, formatter]) => {
+      const before = metric(previous);
+      const after = metric(current);
+      const format = value => value == null ? '—' : formatter ? formatter(value) : roundNumber(value,digits) + unit;
+      const change = before > 0 && after != null ? Math.round((after / before - 1) * 1000) / 10 : null;
+      const delta = change == null ? '—' : (change > 0 ? '+' : '') + roundNumber(change,1) + '%';
+      return '<tr><th scope="row">' + label + '</th><td>' + format(before) + '</td><td>' +
+        format(after) + '</td><td>' + delta + '</td></tr>';
+    }).join('') + '</tbody></table></section>';
+}
+
+function renderRoundView() {
+  const today = inputDate(new Date());
+  const bounds = roundBounds(today,pointRound);
+  const {start,end,previousStart,previousEnd,comparisonEnd,settings} = bounds;
+  const records = roundRecords ?? mergeWorkRecords(readWorkRecords());
+  const previous = roundMode === 'previous';
+  const compare = roundMode === 'compare';
+  document.getElementById('roundHeading').textContent = compare ? '비교' : previous ? '직전 2주' : '진행 중';
+  const dateLabel = compare ? '직전 ' + roundDates(previousStart,comparisonEnd) + ' · 진행 중 ' + roundDates(start,today) :
+    previous ? roundDates(previousStart,previousEnd) : roundDates(start,end);
+  document.getElementById('roundStatus').textContent = [
+    dateLabel, roundRecordStatus, !settings && !previous && !compare ? '회차 설정 확인 대기' : ''
+  ].filter(Boolean).join(' · ');
+
+  const details = document.getElementById('roundDetails');
+  if (compare) {
+    const before = summarizeRound(records,previousStart,comparisonEnd,true);
+    const current = summarizeRound(records,start,today,true);
+    details.innerHTML = roundComparison(before,current) +
+      '<p class="round-note">두 회차의 시작일부터 같은 일수만 비교합니다. 오늘은 현재까지 저장된 실적입니다. 휴식은 근무시간에서 제외되며, 두 플랫폼을 함께 이용한 세션의 시간은 세션 전체로 계산합니다.</p>';
+    return;
+  }
+
+  const totals = summarizeRound(records,previous ? previousStart : start,previous ? previousEnd : today);
+  const stat = value => totals.sessions ? value : '—';
+  const performance = roundStats('저장된 실적 · 전체 플랫폼', [
+    ['순근무시간',stat(roundDuration(totals.minutes))],
+    ['완료 건수',stat(roundNumber(totals.count) + '건')],
+    ['총수입',stat(roundMoney(totals.base + totals.promo))],
+    ['프로모션',stat(roundMoney(totals.promo))],
+    ['시간당 완료 건수',totals.minutes ? roundNumber(totals.count * 60 / totals.minutes,1) + '건' : '—']
+  ]);
+  if (previous) {
+    const points = totals.points == null ? '기록 없음' : formatPoints(totals.points);
+    details.innerHTML = roundStats('배민 평가 기록',[
+      ['시트에 기록된 포인트 합계',points]
+    ]) + performance;
+    return;
+  }
+
+  const points = settings?.baseline;
+  const hasPoints = Number.isFinite(points);
+  const goal = ROUND_POINT_GOAL;
+  const remaining = hasPoints ? Math.max(0,goal-points) : null;
+  const daysLeft = daysBetween(today,end)+1;
+  const verified = settings?.officialAcceptance;
+  const target = settings?.acceptance?.target ?? 0.6;
+  const published = /^\d{4}-\d{2}-\d{2}$/.test(verified?.publishedDate) ?
+    ' · ' + verified.publishedDate.slice(5).replace('-', '/') + ' 확인' : '';
+  details.innerHTML = roundStats('배민 평가 진행률',[
+    ['포인트 · 목표 ' + formatPoints(goal),hasPoints ? formatPoints(points) : '—'],
+    ['남은 포인트',hasPoints ? formatPoints(remaining) : '—'],
+    ['하루 필요 포인트 · 오늘 포함 ' + daysLeft + '일',hasPoints ? formatPoints(Math.ceil(remaining/daysLeft*10)/10) : '—'],
+    ['확정 수락률' + published,Number.isFinite(verified?.rate) ? formatRate(verified.rate) : '—'],
+    ['목표 수락률',formatRate(target)]
+  ]) + performance;
+  if (hasPoints) {
+    const progress = document.createElement('progress');
+    progress.max = goal;
+    progress.value = points;
+    progress.setAttribute('aria-label','배민 포인트 목표 진행률');
+    details.querySelector('h2').after(progress);
+  }
+}
+
 function renderWork() {
   updateTopbar();
   renderWorkDay();
@@ -1409,6 +1641,9 @@ async function refreshWork() {
   syncWorkRecords();
   if (loadingWork) return;
   loadingWork = true;
+  roundRecordChanges = [];
+  displayedRoundDate = inputDate(new Date());
+  roundRecordStatus = '시트 불러오는 중';
   refreshPointRound();
   const status = document.getElementById('status-work');
   try {
@@ -1417,13 +1652,17 @@ async function refreshWork() {
     const data = await workRequest({action:'loadWorkSessions', days});
     if (!Array.isArray(data.records)) throw new Error('Invalid records');
     const remote = data.records.map(record => ({...record, pending:false}));
+    roundRecords = mergeWorkRecords([...remote,...roundRecordChanges]);
+    roundRecordStatus = '';
     storeWorkRecords(reconcileWorkRecords(readWorkRecords(),remote,days));
     renderWork();
     status.textContent = '시트 기록을 불러왔습니다';
   } catch (err) {
     status.textContent = '시트 연결 실패 · 기기에 저장된 기록 표시';
+    roundRecordStatus = roundRecords ? '시트 연결 실패 · 마지막 조회값' : '시트 연결 실패 · 기기 저장 기록';
   } finally {
     loadingWork = false;
+    if (!document.getElementById('roundView').hidden) renderRoundView();
     if (document.getElementById('endOv').classList.contains('show')) previewSessionInputs();
   }
 }

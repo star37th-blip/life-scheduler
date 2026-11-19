@@ -97,6 +97,7 @@ body.running{background:#0a0d1a;}
 .rec-item{padding:7px 16px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .1s;}
 .rec-item:active{background:var(--sf2);}
 .rec-l{font-size:11px;color:var(--dim);font-family:var(--mono);}
+.rec-duration{display:block;margin-top:3px;color:#b4bac4;font:600 12px var(--font);}
 .rec-r{font-size:10px;color:var(--mu);}
 .rec-r.baemin{color:var(--baemin);}
 .rec-r.coupang{color:var(--coupang);}
@@ -1617,6 +1618,11 @@ function renderWork() {
     label.className = 'rec-l';
     label.textContent = record.date + ' 근무 · ' + record.startTime + '–' + record.endTime + dates +
       (record.pending ? ' · 전송 대기' : '');
+    const duration = document.createElement('span');
+    duration.className = 'rec-duration';
+    duration.textContent = /^\d+:\d{2}$/.test(record.duration) ?
+      '소요 ' + roundDuration(workMinutes(record)) : '소요시간 미기록';
+    label.append(duration);
     const amount = document.createElement('span');
     amount.className = 'rec-r';
     amount.textContent = record.awaitingResults

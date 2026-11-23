@@ -443,6 +443,11 @@ body.running{background:#0a0d1a;}
         <span class="result-key">이번 세션 포인트</span>
         <span class="result-val" id="res-points">--</span>
       </div>
+      <div class="result-row" id="res-point-cumulative-row" hidden>
+        <span class="result-key">세션 종료 누적 포인트</span>
+        <span class="result-val" id="res-point-cumulative"></span>
+      </div>
+      <button type="button" class="sbtn sec" id="addSavedPointsBtn" onclick="openSavedPoints()" hidden>누적 포인트 입력</button>
       <div class="result-row">
         <span class="result-key" id="res-acceptance-label">배민 세션 추정 수락률</span>
         <span class="result-val" id="res-acceptance">—</span>
@@ -512,6 +517,24 @@ body.running{background:#0a0d1a;}
     <div class="btn-row">
       <button type="button" class="sbtn sec" id="savedRestCancel" onclick="hideOverlay('savedRestOv')">취소</button>
       <button type="submit" class="sbtn primary" id="savedRestSave">저장</button>
+    </div>
+  </form>
+</div>
+
+<div class="ov result-modal" id="savedPointsOv">
+  <form class="modal" onsubmit="saveSavedPoints(event)" aria-labelledby="savedPointsTitle">
+    <h2 class="mo-title" id="savedPointsTitle">누적 포인트 입력</h2>
+    <p class="record-tip" id="savedPointsSession"></p>
+    <label class="break-field">포인트 산정일
+      <input class="time-inp" id="savedPointsDate" type="date" required>
+    </label>
+    <label class="break-field">이 세션이 끝났을 때의 배민 회차 누적(P)
+      <input class="time-inp" id="savedPointsCumulative" inputmode="decimal" required>
+    </label>
+    <p class="record-tip" id="savedPointsError" role="alert"></p>
+    <div class="btn-row">
+      <button type="button" class="sbtn sec" id="savedPointsCancel" onclick="hideOverlay('savedPointsOv')">취소</button>
+      <button type="submit" class="sbtn primary" id="savedPointsSave">저장</button>
     </div>
   </form>
 </div>
@@ -996,15 +1019,18 @@ function readPointInputs() {
   const previous = document.getElementById('previousCumulative').value.trim().replace(/,/g,'');
   const cumulative = document.getElementById('pointCumulative').value.trim().replace(/,/g,'');
   if (!cumulative) return {};
-  const tenths = value => /^\d+(\.\d)?$/.test(value) ? Math.round(Number(value)*10) : NaN;
-  const before = tenths(previous);
-  const after = tenths(cumulative);
+  const before = pointTenths(previous);
+  const after = pointTenths(cumulative);
   if (!Number.isSafeInteger(before) || !Number.isSafeInteger(after) || after < before) {
     throw new Error('같은 회차의 이전·종료 누적을 입력하세요. 종료 누적은 이전 누적보다 작을 수 없습니다.');
   }
   const pointDate = document.getElementById('pointDate').value;
   if (!pointDate) throw new Error('포인트 산정일을 선택하세요.');
   return {previousCumulative:before/10,pointCumulative:after/10,points:(after-before)/10,pointDate};
+}
+
+function pointTenths(value) {
+  return /^\d+(\.\d)?$/.test(value) ? Math.round(Number(value)*10) : NaN;
 }
 
 function previewPoints() {
@@ -1460,6 +1486,80 @@ async function saveSessionRest(event) {
   }
 }
 
+function canAddSavedPoints(record) {
+  return !!record?.sessionId && !record.pending && record.points == null && record.pointCumulative == null;
+}
+
+function openSavedPoints() {
+  if (!canAddSavedPoints(resultSession)) return;
+  const record = resultSession;
+  const date = document.getElementById('savedPointsDate');
+  const existing = sessionIsoDate(record.pointDate);
+  const work = sessionIsoDate(record.date);
+  const start = sessionIsoDate(record.startDate || record.date);
+  const end = sessionIsoDate(record.endDate || record.date);
+  date.value = existing || end;
+  date.min = existing || (work < start ? work : start);
+  date.max = existing || end;
+  const input = document.getElementById('savedPointsCumulative');
+  input.value = '';
+  document.getElementById('savedPointsSession').textContent =
+    record.date + ' 근무 · ' + record.startTime + '–' + record.endTime;
+  document.getElementById('savedPointsError').textContent = '';
+  document.getElementById('savedPointsOv').classList.add('show');
+  input.focus();
+}
+
+async function saveSavedPoints(event) {
+  event.preventDefault();
+  const record = resultSession;
+  if (!canAddSavedPoints(record)) return;
+  const date = document.getElementById('savedPointsDate');
+  const input = document.getElementById('savedPointsCumulative');
+  const save = document.getElementById('savedPointsSave');
+  const cancel = document.getElementById('savedPointsCancel');
+  const error = document.getElementById('savedPointsError');
+  if (save.disabled) return;
+  const cumulative = pointTenths(input.value.trim().replace(/,/g,''));
+  if (!Number.isSafeInteger(cumulative)) {
+    error.textContent = '종료 누적 포인트를 소수 첫째 자리까지 입력하세요.';
+    return;
+  }
+  error.textContent = '';
+  date.disabled = input.disabled = save.disabled = cancel.disabled = true;
+  try {
+    const result = await workRequest({action:'addSavedSessionPoints',sessionId:record.sessionId,
+      pointDate:date.value,pointCumulative:cumulative/10},true);
+    if (!result.saved || result.sessionId !== record.sessionId || !Array.isArray(result.changes)) {
+      throw new Error('저장 결과를 확인할 수 없습니다.');
+    }
+    const changes = new Map(result.changes.map(change => [change.sessionId,change]));
+    const applyPoints = item => changes.has(item.sessionId) ?
+      {...item,...changes.get(item.sessionId),awaitingResults:false} : item;
+    const local = readWorkRecords();
+    const confirmed = applyPoints(local.find(item => item.sessionId === record.sessionId) || record);
+    if (loadingWork) {
+      roundRecordChanges.push(...local.filter(item => changes.has(item.sessionId)).map(applyPoints),confirmed);
+    }
+    if (roundRecords) roundRecords = mergeWorkRecords([...roundRecords.map(applyPoints),confirmed]);
+    try {
+      storeWorkRecords([...local.map(applyPoints),confirmed]);
+    } catch {
+      document.getElementById('sheetSyncStatus').textContent = '시트에 저장했습니다. 앱 기록을 새로고침하세요.';
+    }
+    hideOverlay('savedPointsOv');
+    renderWork();
+    showResult(confirmed);
+    if (loadingWork) refreshPointRound();
+    else refreshWork();
+  } catch (err) {
+    error.textContent = err.message === 'unknown action' ? 'Apps Script 새 버전 배포 후 누적 포인트를 저장할 수 있습니다.' :
+      err.name === 'AbortError' || err instanceof TypeError ? '시트에 연결할 수 없습니다. 다시 시도하세요.' : err.message;
+  } finally {
+    date.disabled = input.disabled = save.disabled = cancel.disabled = false;
+  }
+}
+
 function showResult(rec){
   resultSession = rec;
   const elapsed = savedSessionElapsed(rec);
@@ -1480,6 +1580,10 @@ function showResult(rec){
   document.getElementById('res-coupang').textContent=cTotal>0?cTotal.toLocaleString()+'원':'-';
   document.getElementById('res-total').textContent=rec.totalPay == null || rec.totalPay === '' ? '실적 입력 대기' : total.toLocaleString()+'원';
   document.getElementById('res-points').textContent=rec.points == null || rec.points === '' ? '—' : Number(rec.points).toLocaleString()+'P';
+  const hasCumulative = Number.isFinite(rec.pointCumulative);
+  document.getElementById('res-point-cumulative-row').hidden = !hasCumulative;
+  document.getElementById('res-point-cumulative').textContent = hasCumulative ? formatPoints(rec.pointCumulative) : '';
+  document.getElementById('addSavedPointsBtn').hidden = !canAddSavedPoints(rec);
   const dailyRejected = rec.baemin_daily_rejected;
   const stored = document.getElementById('res-acceptance');
   document.getElementById('res-acceptance-label').textContent = dailyRejected != null ?
